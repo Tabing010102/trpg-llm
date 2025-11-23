@@ -1,0 +1,60 @@
+{
+  "name": "Simple Adventure",
+  "rule_system": "generic",
+  "description": "A simple adventure game for testing",
+  "characters": {
+    "player1": {
+      "id": "player1",
+      "name": "Hero",
+      "type": "player",
+      "control": "human",
+      "description": "A brave adventurer",
+      "attributes": {
+        "strength": 15,
+        "intelligence": 12,
+        "dexterity": 14
+      },
+      "state": {
+        "hp": 20,
+        "level": 1
+      }
+    },
+    "gm": {
+      "id": "gm",
+      "name": "Game Master",
+      "type": "gm",
+      "control": "ai",
+      "description": "Controls the game world",
+      "ai_config": {
+        "model": "gpt-3.5-turbo",
+        "temperature": 0.7
+      }
+    }
+  },
+  "llm_config": {
+    "default_model": "gpt-3.5-turbo",
+    "temperature": 0.7,
+    "prompts": {
+      "gm_system": "You are a Game Master creating an engaging adventure."
+    }
+  },
+  "workflow": {
+    "turn_order": ["gm", "player1"]
+  },
+  "tools": [
+    {
+      "name": "roll_dice",
+      "description": "Roll dice",
+      "parameters": {
+        "notation": {
+          "type": "string",
+          "description": "Dice notation (e.g., '1d20')"
+        }
+      }
+    }
+  ],
+  "initial_state": {
+    "location": "Village Square",
+    "quest_active": false
+  }
+}

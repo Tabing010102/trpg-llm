@@ -1,0 +1,107 @@
+# Example Call of Cthulhu 7th Edition game configuration
+
+name: "The Haunted Mansion"
+rule_system: "coc7e"
+description: "A mysterious mansion investigation"
+
+# Character definitions
+characters:
+  investigator1:
+    id: "investigator1"
+    name: "Detective Sarah Chen"
+    type: "player"
+    control: "ai"
+    description: "A sharp-minded detective with a nose for the supernatural"
+    attributes:
+      str: 60
+      con: 50
+      dex: 65
+      int: 80
+      pow: 70
+      app: 60
+      edu: 75
+      siz: 55
+    state:
+      hp: 10
+      mp: 14
+      sanity: 70
+      luck: 60
+    ai_config:
+      model: "gpt-3.5-turbo"
+      temperature: 0.7
+  
+  keeper:
+    id: "keeper"
+    name: "Keeper"
+    type: "gm"
+    control: "ai"
+    description: "The Game Master controlling the narrative"
+    ai_config:
+      model: "gpt-4"
+      temperature: 0.8
+
+# LLM configuration
+llm_config:
+  default_model: "gpt-3.5-turbo"
+  temperature: 0.7
+  max_tokens: 1000
+  
+  prompts:
+    gm_system: |
+      You are the Keeper (Game Master) for a Call of Cthulhu game.
+      Create an atmospheric, mysterious experience.
+      Describe the environment vividly and control NPCs naturally.
+    
+    player_system: |
+      You are an investigator in a Call of Cthulhu game.
+      Make decisions based on your character's skills and personality.
+      React authentically to horror and the unknown.
+
+# Workflow configuration
+workflow:
+  turn_order:
+    - keeper
+    - investigator1
+  
+  phases:
+    - investigation
+    - combat
+    - rest
+
+# Available tools/actions
+tools:
+  - name: "roll_skill"
+    description: "Roll a skill check"
+    parameters:
+      skill_name:
+        type: "string"
+        description: "Name of the skill (e.g., 'Spot Hidden', 'Psychology')"
+      difficulty:
+        type: "string"
+        enum: ["regular", "hard", "extreme"]
+        default: "regular"
+  
+  - name: "update_hp"
+    description: "Update character HP"
+    parameters:
+      character_id:
+        type: "string"
+      change:
+        type: "integer"
+        description: "HP change (negative for damage)"
+  
+  - name: "sanity_check"
+    description: "Perform a sanity check"
+    parameters:
+      character_id:
+        type: "string"
+      loss_on_failure:
+        type: "string"
+        description: "Sanity loss dice (e.g., '1d6')"
+
+# Initial game state
+initial_state:
+  location: "Outside the Mansion"
+  time: "Evening"
+  atmosphere: "tense"
+  clues_found: []
