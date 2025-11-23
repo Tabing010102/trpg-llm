@@ -1,7 +1,7 @@
 """Tests for state machine and event sourcing"""
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from trpg_llm.state.state_machine import StateMachine
 from trpg_llm.models.game_state import GameConfig
@@ -165,7 +165,7 @@ class TestStateMachine:
         state_machine.add_event(event1)
         
         # Remember timestamp
-        cutoff_time = datetime.utcnow()
+        cutoff_time = datetime.now(timezone.utc)
         
         # Add event in the future (simulate)
         event2 = state_machine.create_event(

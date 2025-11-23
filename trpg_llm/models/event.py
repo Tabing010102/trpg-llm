@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field
 
 
@@ -36,7 +36,7 @@ class Event(BaseModel):
     """Event in the game timeline"""
     
     id: str = Field(..., description="Unique event identifier")
-    timestamp: datetime = Field(default_factory=datetime.utcnow, description="Event timestamp")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Event timestamp")
     type: EventType = Field(..., description="Event type")
     
     # Event source

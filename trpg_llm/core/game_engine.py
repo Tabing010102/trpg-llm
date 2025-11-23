@@ -2,7 +2,7 @@
 
 from typing import Dict, Any, Optional, List
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from ..models.game_state import GameConfig, GameState, GameSession
 from ..models.event import Event, EventType, StateDiff
@@ -31,7 +31,7 @@ class GameEngine:
         start_event = self.state_machine.create_event(
             event_type=EventType.GAME_START,
             data={
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "config_name": self.config.name,
             }
         )
@@ -133,7 +133,7 @@ class GameEngine:
             "sender_id": sender_id,
             "content": content,
             "type": message_type,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "metadata": metadata or {},
         }
         

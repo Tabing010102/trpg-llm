@@ -1,7 +1,7 @@
 """State machine with event sourcing"""
 
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import copy
 import uuid
 
@@ -114,7 +114,7 @@ class StateMachine:
         """Create a new event with automatic ID and timestamp"""
         return Event(
             id=str(uuid.uuid4()),
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             type=event_type,
             actor_id=actor_id,
             data=data or {},
