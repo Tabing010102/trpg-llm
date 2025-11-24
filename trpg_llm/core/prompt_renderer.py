@@ -164,13 +164,13 @@ Current Turn: {{ current_turn }}
 {% if characters %}
 Characters:
 {% for char_id, char in characters.items() %}
-- {{ char | format_character | indent(2) }}
+  {{ char | format_character }}
 {% endfor %}
 {% endif %}
 
 {% if state %}
 Global State:
-  {{ state | format_state | indent(2) }}
+  {{ state | format_state }}
 {% endif %}
 
 {% if recent_messages %}

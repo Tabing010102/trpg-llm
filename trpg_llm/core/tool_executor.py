@@ -103,8 +103,8 @@ class ToolExecutor:
             }
         
         try:
-            # Execute the tool with context (always pass both arguments)
-            result = tool_func(arguments, context if context is not None else {})
+            # Execute the tool - always pass both arguments and context
+            result = tool_func(arguments, context or {})
             
             # Normalize result format
             if isinstance(result, dict):

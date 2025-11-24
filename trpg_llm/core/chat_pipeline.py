@@ -31,6 +31,10 @@ class ChatPipeline:
         self.prompt_renderer = PromptRenderer()
         self.agent_manager = agent_manager
     
+    def _normalize_state_diffs(self, state_diffs: List) -> List[Dict[str, Any]]:
+        """Normalize state_diffs to dict format"""
+        return [diff.dict() if isinstance(diff, StateDiff) else diff for diff in state_diffs]
+    
     async def process_chat(
         self,
         role_id: str,
@@ -178,7 +182,7 @@ class ChatPipeline:
             
             return {
                 "content": final_content,
-                "state_diffs": event_diffs + [diff.dict() if isinstance(diff, StateDiff) else diff for diff in all_state_diffs],
+                "state_diffs": event_diffs + self._normalize_state_diffs(all_state_diffs),
                 "current_state": new_state.dict(),
                 "tool_calls": all_tool_calls,
                 "role_id": role_id,
@@ -188,7 +192,7 @@ class ChatPipeline:
             # No content generated, just return state
             return {
                 "content": None,
-                "state_diffs": [diff.dict() if isinstance(diff, StateDiff) else diff for diff in all_state_diffs],
+                "state_diffs": self._normalize_state_diffs(all_state_diffs),
                 "current_state": game_state.dict(),
                 "tool_calls": all_tool_calls,
                 "role_id": role_id,
@@ -323,7 +327,7 @@ class ChatPipeline:
             
             return {
                 "content": final_content,
-                "state_diffs": event_diffs + [diff.dict() if isinstance(diff, StateDiff) else diff for diff in all_state_diffs],
+                "state_diffs": event_diffs + self._normalize_state_diffs(all_state_diffs),
                 "current_state": new_state.dict(),
                 "tool_calls": all_tool_calls,
                 "role_id": role_id,
@@ -333,7 +337,7 @@ class ChatPipeline:
             # No content generated, just return state
             return {
                 "content": None,
-                "state_diffs": [diff.dict() if isinstance(diff, StateDiff) else diff for diff in all_state_diffs],
+                "state_diffs": self._normalize_state_diffs(all_state_diffs),
                 "current_state": game_state.dict(),
                 "tool_calls": all_tool_calls,
                 "role_id": role_id,

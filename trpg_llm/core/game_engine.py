@@ -2,6 +2,7 @@
 
 from typing import Dict, Any, Optional, List
 import uuid
+import logging
 from datetime import datetime, timezone
 
 from ..models.game_state import GameConfig, GameState, GameSession
@@ -10,6 +11,8 @@ from ..models.dice import DiceRoll
 from ..state.state_machine import StateMachine
 from .dice import DiceSystem
 from ..sandbox.sandbox import ScriptSandbox
+
+logger = logging.getLogger(__name__)
 
 
 class GameEngine:
@@ -256,7 +259,7 @@ class GameEngine:
                         )
         except Exception as e:
             # Log error but don't crash the game
-            print(f"Script hook '{hook_name}' failed: {str(e)}")
+            logger.error(f"Script hook '{hook_name}' failed: {str(e)}", exc_info=True)
     
     def execute_script(
         self,
