@@ -39,7 +39,8 @@ class AIAgentManager:
             "player": AgentType.PLAYER,
             "npc": AgentType.NPC,
         }
-        agent_type = agent_type_map.get(character.type.value, AgentType.NPC)
+        char_type = character.type.value if hasattr(character.type, 'value') else character.type
+        agent_type = agent_type_map.get(char_type, AgentType.NPC)
         
         # Get AI config
         ai_config = character.ai_config or {}

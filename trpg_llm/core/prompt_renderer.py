@@ -83,8 +83,8 @@ class PromptRenderer:
                 char_id: {
                     "id": char.id,
                     "name": char.name,
-                    "type": char.type.value,
-                    "control": char.control.value,
+                    "type": char.type.value if hasattr(char.type, 'value') else char.type,
+                    "control": char.control.value if hasattr(char.control, 'value') else char.control,
                     "attributes": char.attributes,
                     "state": char.state,
                     "description": char.description,

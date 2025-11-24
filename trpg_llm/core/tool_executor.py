@@ -103,20 +103,27 @@ class ToolExecutor:
             }
         
         try:
-            # Execute the tool with context if provided
-            if context:
-                result = tool_func(arguments, context)
-            else:
-                result = tool_func(arguments)
+            # Execute the tool with context (always pass both arguments)
+            result = tool_func(arguments, context if context is not None else {})
             
             # Normalize result format
             if isinstance(result, dict):
-                return {
-                    "success": True,
-                    "result": result.get("result"),
-                    "state_diffs": result.get("state_diffs", []),
-                    "error": None
-                }
+                # If result already has our expected keys, use it
+                if "result" in result or "state_diffs" in result:
+                    return {
+                        "success": True,
+                        "result": result.get("result"),
+                        "state_diffs": result.get("state_diffs", []),
+                        "error": None
+                    }
+                else:
+                    # Otherwise, treat the whole dict as the result
+                    return {
+                        "success": True,
+                        "result": result,
+                        "state_diffs": [],
+                        "error": None
+                    }
             else:
                 return {
                     "success": True,

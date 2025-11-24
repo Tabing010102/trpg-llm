@@ -228,7 +228,7 @@ class GameEngine:
                 char_id: {
                     "id": char.id,
                     "name": char.name,
-                    "type": char.type.value,
+                    "type": char.type.value if hasattr(char.type, 'value') else char.type,
                     "attributes": char.attributes,
                     "state": char.state,
                 }
@@ -282,7 +282,7 @@ class GameEngine:
                 char_id: {
                     "id": char.id,
                     "name": char.name,
-                    "type": char.type.value,
+                    "type": char.type.value if hasattr(char.type, 'value') else char.type,
                     "attributes": char.attributes,
                     "state": char.state,
                 }
@@ -310,8 +310,9 @@ class GameEngine:
             Game state after rollback, ready for regeneration
         """
         # Find the last message event from this character
+        event_history = self.get_event_history()
         last_message_event = None
-        for event in reversed(self.event_history):
+        for event in reversed(event_history):
             if (event.type == EventType.MESSAGE and 
                 event.actor_id == character_id):
                 last_message_event = event
@@ -321,9 +322,9 @@ class GameEngine:
             raise ValueError(f"No message found from character {character_id}")
         
         # Find the event before this message
-        event_index = self.event_history.index(last_message_event)
+        event_index = event_history.index(last_message_event)
         if event_index > 0:
-            previous_event = self.event_history[event_index - 1]
+            previous_event = event_history[event_index - 1]
             return self.rollback_to_event(previous_event.id)
         else:
             # This was the first event, rollback to start
@@ -349,8 +350,9 @@ class GameEngine:
             Updated game state
         """
         # Find the event
+        event_history = self.get_event_history()
         event_index = None
-        for i, event in enumerate(self.event_history):
+        for i, event in enumerate(event_history):
             if event.id == event_id:
                 event_index = i
                 break
@@ -359,7 +361,7 @@ class GameEngine:
             raise ValueError(f"Event {event_id} not found")
         
         # Get the event
-        event = self.event_history[event_index]
+        event = event_history[event_index]
         
         # Update event data
         if new_data is not None:
@@ -381,7 +383,8 @@ class GameEngine:
         Returns:
             Event if found, None otherwise
         """
-        for event in self.event_history:
+        event_history = self.get_event_history()
+        for event in event_history:
             if event.id == event_id:
                 return event
         return None
@@ -396,7 +399,8 @@ class GameEngine:
         Returns:
             List of matching events
         """
-        return [e for e in self.event_history if e.type == event_type]
+        event_history = self.get_event_history()
+        return [e for e in event_history if e.type == event_type]
     
     def find_events_by_actor(self, actor_id: str) -> List[Event]:
         """
@@ -408,4 +412,5 @@ class GameEngine:
         Returns:
             List of matching events
         """
-        return [e for e in self.event_history if e.actor_id == actor_id]
+        event_history = self.get_event_history()
+        return [e for e in event_history if e.actor_id == actor_id]
