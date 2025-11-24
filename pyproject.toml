@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trpg-llm"
+version = "0.1.0"
+description = "A configuration-driven TRPG framework with LLM integration"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    {name = "TRPG-LLM Team"}
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --cov=trpg_llm --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
