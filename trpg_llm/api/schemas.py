@@ -70,3 +70,42 @@ class RollbackRequest(BaseModel):
     """Request to rollback game state"""
     event_id: Optional[str] = Field(None, description="Event ID to rollback to")
     timestamp: Optional[datetime] = Field(None, description="Timestamp to rollback to")
+
+
+class ChatRequest(BaseModel):
+    """Request for chat/message pipeline"""
+    role_id: str = Field(..., description="Character ID sending/generating message")
+    message: Optional[str] = Field(None, description="Message content (required for humans)")
+    template: Optional[str] = Field(None, description="Optional Jinja2 template for prompt")
+    max_tool_iterations: int = Field(3, description="Max tool calling iterations")
+
+
+class ChatResponse(BaseModel):
+    """Response for chat pipeline"""
+    content: Optional[str] = Field(None, description="Generated message content")
+    state_diffs: List[Dict[str, Any]] = Field(default_factory=list, description="State changes")
+    current_state: Dict[str, Any] = Field(..., description="Current game state")
+    tool_calls: List[Dict[str, Any]] = Field(default_factory=list, description="Tool calls made")
+    role_id: str = Field(..., description="Character ID")
+    is_ai: bool = Field(..., description="Whether this is an AI character")
+    error: Optional[str] = Field(None, description="Error message if any")
+
+
+class RedrawMessageRequest(BaseModel):
+    """Request to redraw last AI message"""
+    character_id: str = Field(..., description="AI character whose message to redraw")
+    template: Optional[str] = Field(None, description="Optional template for regeneration")
+
+
+class EditEventRequest(BaseModel):
+    """Request to edit an event"""
+    event_id: str = Field(..., description="ID of event to edit")
+    new_data: Optional[Dict[str, Any]] = Field(None, description="New event data")
+    new_state_diffs: Optional[List[Dict[str, Any]]] = Field(None, description="New state diffs")
+
+
+class EditEventResponse(BaseModel):
+    """Response for event editing"""
+    session_id: str
+    event_id: str
+    current_state: Dict[str, Any]
