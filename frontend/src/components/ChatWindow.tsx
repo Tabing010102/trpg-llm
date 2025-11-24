@@ -1,14 +1,16 @@
-import React, { useRef, useEffect } from 'react';
-import type { Message, Character } from '../types/api';
+import React, { useRef, useEffect, useState } from 'react';
+import type { Message, Character, LLMProfile } from '../types/api';
 
 interface ChatWindowProps {
   messages: Message[];
   characters: Record<string, Character>;
-  onRedraw: (characterId: string) => void;
+  llmProfiles: LLMProfile[];
+  onRedraw: (characterId: string, profileId?: string) => void;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, characters, onRedraw }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ messages, characters, llmProfiles, onRedraw }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showProfileSelector, setShowProfileSelector] = useState<number | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -19,12 +21,34 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, characters, onRedraw 
     return character || { name: senderId, type: 'unknown', control: 'unknown' };
   };
 
+  const getProfileInfo = (profileId?: string) => {
+    if (!profileId) return null;
+    return llmProfiles.find(p => p.id === profileId);
+  };
+
+  const handleRedrawClick = (messageIndex: number, senderId: string) => {
+    if (llmProfiles.length > 0) {
+      // Show profile selector if profiles are available
+      setShowProfileSelector(messageIndex);
+    } else {
+      // Redraw with default profile
+      onRedraw(senderId);
+    }
+  };
+
+  const handleProfileSelect = (senderId: string, profileId?: string) => {
+    setShowProfileSelector(null);
+    onRedraw(senderId, profileId);
+  };
+
   return (
     <div className="chat-window">
       <div className="messages">
         {messages.map((msg, idx) => {
           const charInfo = getCharacterInfo(msg.sender_id);
           const isAI = charInfo.control === 'ai' || msg.is_ai;
+          const usedProfile = msg.metadata?.used_profile_id;
+          const profileInfo = getProfileInfo(usedProfile);
           
           return (
             <div key={idx} className={`message message-${charInfo.type}`}>
@@ -32,6 +56,11 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, characters, onRedraw 
                 <span className="character-name">{charInfo.name}</span>
                 <span className="character-type">[{charInfo.type.toUpperCase()}]</span>
                 {isAI && <span className="ai-badge">AI</span>}
+                {profileInfo && (
+                  <span className="profile-badge" title={`Provider: ${profileInfo.provider_type}`}>
+                    📦 {profileInfo.model}
+                  </span>
+                )}
                 {msg.timestamp && (
                   <span className="message-time">
                     {new Date(msg.timestamp).toLocaleTimeString()}
@@ -41,13 +70,38 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, characters, onRedraw 
               <div className="message-content">{msg.content}</div>
               {isAI && (
                 <div className="message-actions">
-                  <button
-                    className="btn btn-small"
-                    onClick={() => onRedraw(msg.sender_id)}
-                    title="Redraw last AI message"
-                  >
-                    🔄 Redraw
-                  </button>
+                  {showProfileSelector === idx ? (
+                    <div className="profile-selector">
+                      <select
+                        onChange={(e) => handleProfileSelect(msg.sender_id, e.target.value || undefined)}
+                        defaultValue={usedProfile || ''}
+                        className="profile-select-small"
+                        autoFocus
+                      >
+                        <option value="">Default Profile</option>
+                        {llmProfiles.map(profile => (
+                          <option key={profile.id} value={profile.id}>
+                            {profile.id} ({profile.model})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-small"
+                        onClick={() => setShowProfileSelector(null)}
+                        title="Cancel"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-small"
+                      onClick={() => handleRedrawClick(idx, msg.sender_id)}
+                      title="Redraw with different profile"
+                    >
+                      🔄 Redraw
+                    </button>
+                  )}
                 </div>
               )}
             </div>

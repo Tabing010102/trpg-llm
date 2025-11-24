@@ -100,7 +100,7 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (roleId: string, message: string) => {
+  const handleSendMessage = async (roleId: string, message: string, profileId?: string) => {
     if (!sessionId) return;
     
     setLoading(true);
@@ -108,6 +108,7 @@ function App() {
       const response = await apiService.chat(sessionId, {
         role_id: roleId,
         message,
+        llm_profile_id: profileId,
       });
 
       if (response.error) {
@@ -124,13 +125,14 @@ function App() {
     }
   };
 
-  const handleRedraw = async (characterId: string) => {
+  const handleRedraw = async (characterId: string, profileId?: string) => {
     if (!sessionId) return;
 
     setLoading(true);
     try {
       const response = await apiService.redrawMessage(sessionId, {
         character_id: characterId,
+        llm_profile_id: profileId,
       });
 
       if (response.error) {
@@ -197,10 +199,12 @@ function App() {
           <ChatWindow
             messages={gameState?.messages || []}
             characters={gameState?.characters || {}}
+            llmProfiles={gameState?.config.llm_profiles || []}
             onRedraw={handleRedraw}
           />
           <ChatInput
             characters={gameState?.characters || {}}
+            llmProfiles={gameState?.config.llm_profiles || []}
             onSend={handleSendMessage}
             disabled={loading || !sessionId}
           />

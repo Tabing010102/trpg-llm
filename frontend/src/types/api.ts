@@ -9,9 +9,23 @@ export interface Character {
   attributes?: Record<string, any>;
   state?: Record<string, any>;
   ai_config?: {
-    model: string;
-    temperature: number;
+    model?: string;
+    temperature?: number;
+    profile_id?: string;
   };
+}
+
+export interface LLMProfile {
+  id: string;
+  provider_type: string;
+  model: string;
+  temperature: number;
+  base_url?: string;
+  api_key_ref?: string;
+  top_p?: number;
+  max_tokens?: number;
+  context_window?: number;
+  extra_params?: Record<string, any>;
 }
 
 export interface GameState {
@@ -22,6 +36,7 @@ export interface GameState {
     description?: string;
     characters: Record<string, Character>;
     llm_config?: Record<string, any>;
+    llm_profiles?: LLMProfile[];
     workflow?: Record<string, any>;
     tools?: any[];
     initial_state?: Record<string, any>;
@@ -76,6 +91,7 @@ export interface ChatRequest {
   message?: string;
   template?: string;
   max_tool_iterations?: number;
+  llm_profile_id?: string;
 }
 
 export interface ChatResponse {
@@ -86,11 +102,13 @@ export interface ChatResponse {
   role_id: string;
   is_ai: boolean;
   error?: string;
+  used_profile_id?: string;
 }
 
 export interface RedrawMessageRequest {
   character_id: string;
   template?: string;
+  llm_profile_id?: string;
 }
 
 export interface EditEventRequest {
