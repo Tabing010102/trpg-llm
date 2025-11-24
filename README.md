@@ -41,8 +41,11 @@ TRPG-LLM is a Python-based framework for running tabletop role-playing games wit
 - Real-time state updates
 - WebSocket support (planned)
 - Frontend-agnostic design
+- **Web Frontend**: React + TypeScript interface for playing and debugging games
 
 ## Installation
+
+### Backend
 
 ```bash
 # Clone the repository
@@ -56,7 +59,45 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+### Frontend
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The frontend will be available at `http://localhost:5173` and connects to the backend at `http://localhost:8000`.
+
 ## Quick Start
+
+### Option 1: Using the Web Frontend (Recommended)
+
+1. **Start the backend server**:
+```bash
+python -m trpg_llm.main --host 0.0.0.0 --port 8000
+```
+
+2. **Start the frontend** (in a new terminal):
+```bash
+cd frontend
+npm run dev
+```
+
+3. **Open your browser** to `http://localhost:5173`
+
+4. **Click "New Session"** to create a game with default configuration
+
+5. **Start playing!** Select a character, type a message, and send it
+
+See [frontend/README.md](frontend/README.md) for detailed frontend documentation.
+
+### Option 2: Using the API Directly
 
 ### 1. Create a Game Configuration
 
@@ -309,6 +350,7 @@ See `configs/coc_example.yaml` for a complete example.
 
 ## Roadmap
 
+- [x] **Web Frontend**: React-based UI for playing and debugging games
 - [ ] WebSocket support for real-time updates
 - [ ] Database persistence (PostgreSQL, MongoDB)
 - [ ] Additional rule systems (D&D 5e, Pathfinder)
@@ -317,6 +359,9 @@ See `configs/coc_example.yaml` for a complete example.
 - [ ] Campaign management
 - [ ] Session replay viewer
 - [ ] Character sheet generator
+- [ ] Multi-session management in frontend
+- [ ] Visual character sheet editor
+- [ ] Map/location visualization
 
 ## Contributing
 
@@ -333,3 +378,5 @@ Built with:
 - [LiteLLM](https://github.com/BerriAI/litellm) - LLM integration
 - [Pydantic](https://pydantic-docs.helpmanual.io/) - Data validation
 - [PyYAML](https://pyyaml.org/) - YAML parsing
+- [React](https://react.dev/) - Frontend UI framework
+- [Vite](https://vitejs.dev/) - Frontend build tool
