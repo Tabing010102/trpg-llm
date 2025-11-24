@@ -1,5 +1,7 @@
 # TRPG-LLM
 
+[![CI](https://github.com/Tabing010102/trpg-llm/actions/workflows/ci.yml/badge.svg)](https://github.com/Tabing010102/trpg-llm/actions/workflows/ci.yml)
+
 A configuration-driven TRPG (Tabletop Role-Playing Game) framework with LLM integration.
 
 ## Overview
