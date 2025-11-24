@@ -5,6 +5,7 @@ from ..models.character import Character, CharacterControlType
 from ..models.game_state import GameConfig
 from .agent import AIAgent, AgentType
 from .llm_client import LLMClient
+from .profile import LLMProfileRegistry
 
 
 class AIAgentManager:
@@ -16,6 +17,13 @@ class AIAgentManager:
     def __init__(self, config: GameConfig):
         self.config = config
         self.agents: Dict[str, AIAgent] = {}
+        
+        # Initialize profile registry
+        self.profile_registry = LLMProfileRegistry.from_config(
+            llm_config=config.llm_config,
+            llm_profiles=config.llm_profiles
+        )
+        
         self._initialize_agents()
     
     def _initialize_agents(self) -> None:
@@ -44,16 +52,29 @@ class AIAgentManager:
         
         # Get AI config
         ai_config = character.ai_config or {}
-        model = ai_config.get("model", self.config.llm_config.get("default_model", "gpt-3.5-turbo"))
-        temperature = ai_config.get("temperature", self.config.llm_config.get("temperature", 0.7))
         
-        # Create LLM client
-        llm_client = LLMClient(
-            model=model,
-            api_key=ai_config.get("api_key"),
-            base_url=ai_config.get("base_url"),
-            temperature=temperature
-        )
+        # Determine which profile to use
+        profile_id = ai_config.get("profile_id")
+        if not profile_id:
+            # Fallback to default_profile_id from llm_config
+            profile_id = self.config.llm_config.get("default_profile_id", "default")
+        
+        # Get profile and create LLM client
+        profile = self.profile_registry.get_profile(profile_id)
+        if profile:
+            # Use profile to configure LLM client
+            client_params = self.profile_registry.build_llm_client_params(profile)
+            llm_client = LLMClient(**client_params)
+        else:
+            # Fallback to legacy configuration if profile not found
+            model = ai_config.get("model", self.config.llm_config.get("default_model", "gpt-3.5-turbo"))
+            temperature = ai_config.get("temperature", self.config.llm_config.get("temperature", 0.7))
+            llm_client = LLMClient(
+                model=model,
+                api_key=ai_config.get("api_key"),
+                base_url=ai_config.get("base_url"),
+                temperature=temperature
+            )
         
         # Get system prompt
         system_prompt = self._get_system_prompt(character, agent_type)
@@ -161,3 +182,20 @@ class AIAgentManager:
         """Clear all agents' conversation histories"""
         for agent in self.agents.values():
             agent.clear_history()
+    
+    def create_llm_client_from_profile(self, profile_id: str) -> Optional[LLMClient]:
+        """
+        Create an LLM client from a profile ID.
+        
+        Args:
+            profile_id: Profile identifier
+            
+        Returns:
+            LLMClient instance or None if profile not found
+        """
+        profile = self.profile_registry.get_profile(profile_id)
+        if not profile:
+            return None
+        
+        client_params = self.profile_registry.build_llm_client_params(profile)
+        return LLMClient(**client_params)

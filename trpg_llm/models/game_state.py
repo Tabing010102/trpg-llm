@@ -51,6 +51,12 @@ class GameConfig(BaseModel):
         default_factory=list,
         description="Available tools/actions"
     )
+    
+    # LLM Profiles for multi-provider support
+    llm_profiles: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="LLM connection profiles for multi-provider support"
+    )
 
 
 class GameState(BaseModel):

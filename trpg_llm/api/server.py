@@ -268,7 +268,8 @@ def create_app() -> FastAPI:
                 role_id=request.role_id,
                 message=request.message,
                 template=request.template,
-                max_tool_iterations=request.max_tool_iterations
+                max_tool_iterations=request.max_tool_iterations,
+                llm_profile_id=request.llm_profile_id
             )
             
             return ChatResponse(**result)
@@ -288,6 +289,17 @@ def create_app() -> FastAPI:
             engine = GAME_SESSIONS[session_id]
             pipeline = CHAT_PIPELINES[session_id]
             
+            # Get the profile_id from the last message if not specified
+            profile_id_to_use = request.llm_profile_id
+            if not profile_id_to_use:
+                # Try to get from last message metadata
+                events = engine.get_event_history()
+                for event in reversed(events):
+                    if event.event_type.value == "MESSAGE" and event.actor_id == request.character_id:
+                        if event.metadata and "used_profile_id" in event.metadata:
+                            profile_id_to_use = event.metadata["used_profile_id"]
+                        break
+            
             # Rollback to before the last message
             state = engine.redraw_last_ai_message(request.character_id)
             
@@ -295,7 +307,8 @@ def create_app() -> FastAPI:
             result = await pipeline.process_chat(
                 role_id=request.character_id,
                 message=None,
-                template=request.template
+                template=request.template,
+                llm_profile_id=profile_id_to_use
             )
             
             return ChatResponse(**result)
