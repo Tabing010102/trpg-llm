@@ -99,12 +99,22 @@ def create_app() -> FastAPI:
     async def add_profile(profile: dict):
         """Add a single profile to the global registry"""
         global GLOBAL_PROFILE_REGISTRY
+        profile_id = profile.get('id')
+        
+        # Validate profile ID exists
+        if not profile_id:
+            raise HTTPException(status_code=400, detail="Profile must have an 'id' field")
+        
+        # Check for duplicate
+        if GLOBAL_PROFILE_REGISTRY and profile_id in GLOBAL_PROFILE_REGISTRY.profiles:
+            raise HTTPException(status_code=409, detail=f"Profile '{profile_id}' already exists. Use PUT to update.")
+        
         if GLOBAL_PROFILE_REGISTRY is None:
             GLOBAL_PROFILE_REGISTRY = LLMProfileRegistry([profile])
         else:
             new_profile = LLMProfile(**profile)
             GLOBAL_PROFILE_REGISTRY.profiles[new_profile.id] = new_profile
-        return {"message": f"Profile '{profile.get('id')}' added"}
+        return {"message": f"Profile '{profile_id}' added"}
     
     @app.delete("/api/v1/profiles/{profile_id}")
     async def delete_profile(profile_id: str):
@@ -130,6 +140,13 @@ def create_app() -> FastAPI:
         """Set or update the default profile for a character in a session"""
         if session_id not in GAME_SESSIONS:
             raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Validate profile exists in global registry
+        if GLOBAL_PROFILE_REGISTRY is None or not GLOBAL_PROFILE_REGISTRY.has_profile(request.profile_id):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Profile '{request.profile_id}' not found. Please add it to the global registry first."
+            )
         
         # Initialize session character profiles if not exists
         if session_id not in SESSION_CHARACTER_PROFILES:

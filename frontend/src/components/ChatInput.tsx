@@ -55,6 +55,14 @@ const ChatInput: React.FC<ChatInputProps> = ({
     ? llmProfiles.find(p => p.id === sessionDefaultProfile)
     : undefined;
 
+  // Helper to get the default option label for profile selector
+  const getDefaultOptionLabel = (): string => {
+    if (sessionProfileInfo) {
+      return `Session Default: ${sessionProfileInfo.id} (${sessionProfileInfo.model})`;
+    }
+    return 'Use Session/Game Default';
+  };
+
   return (
     <div className="chat-input">
       <div className="input-row">
@@ -101,10 +109,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             className="profile-select"
           >
             <option value="">
-              {sessionProfileInfo 
-                ? `Session Default: ${sessionProfileInfo.id} (${sessionProfileInfo.model})`
-                : 'Use Session/Game Default'
-              }
+              {getDefaultOptionLabel()}
             </option>
             {llmProfiles.map(profile => (
               <option key={profile.id} value={profile.id}>
