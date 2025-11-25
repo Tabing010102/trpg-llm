@@ -5,12 +5,22 @@ interface ChatWindowProps {
   messages: Message[];
   characters: Record<string, Character>;
   llmProfiles: LLMProfile[];
+  sessionCharacterProfiles: Record<string, string>;
   onRedraw: (characterId: string, profileId?: string) => void;
+  onSetCharacterProfile: (characterId: string, profileId: string | null) => void;
 }
 
-const ChatWindow: React.FC<ChatWindowProps> = ({ messages, characters, llmProfiles, onRedraw }) => {
+const ChatWindow: React.FC<ChatWindowProps> = ({ 
+  messages, 
+  characters, 
+  llmProfiles, 
+  sessionCharacterProfiles,
+  onRedraw,
+  onSetCharacterProfile 
+}) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [showProfileSelector, setShowProfileSelector] = useState<number | null>(null);
+  const [showCharacterProfileEditor, setShowCharacterProfileEditor] = useState<string | null>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -41,8 +51,79 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ messages, characters, llmProfil
     onRedraw(senderId, profileId);
   };
 
+  const handleSetDefaultProfile = (characterId: string, profileId: string) => {
+    setShowCharacterProfileEditor(null);
+    onSetCharacterProfile(characterId, profileId || null);
+  };
+
+  // Get unique AI characters from messages for showing session profile settings
+  const aiCharactersInSession = Array.from(new Set(
+    messages
+      .filter(msg => {
+        const charInfo = getCharacterInfo(msg.sender_id);
+        return charInfo.control === 'ai' || msg.is_ai;
+      })
+      .map(msg => msg.sender_id)
+  ));
+
   return (
     <div className="chat-window">
+      {/* Session Character Profile Settings */}
+      {aiCharactersInSession.length > 0 && llmProfiles.length > 0 && (
+        <div className="session-profile-settings">
+          <div className="session-profile-header">
+            <strong>Session Profile Defaults:</strong>
+            <span className="session-profile-hint">(overrides game preset defaults for this session)</span>
+          </div>
+          <div className="session-profile-list">
+            {aiCharactersInSession.map(charId => {
+              const charInfo = getCharacterInfo(charId);
+              const currentProfile = sessionCharacterProfiles[charId];
+              const profileInfo = getProfileInfo(currentProfile);
+              
+              return (
+                <div key={charId} className="session-profile-item">
+                  <span className="session-profile-char">{charInfo.name}:</span>
+                  {showCharacterProfileEditor === charId ? (
+                    <div className="profile-selector inline">
+                      <select
+                        onChange={(e) => handleSetDefaultProfile(charId, e.target.value)}
+                        value={currentProfile || ''}
+                        className="profile-select-small"
+                        autoFocus
+                      >
+                        <option value="">Game Preset Default</option>
+                        {llmProfiles.map(profile => (
+                          <option key={profile.id} value={profile.id}>
+                            {profile.id} ({profile.model})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        className="btn btn-small"
+                        onClick={() => setShowCharacterProfileEditor(null)}
+                        title="Cancel"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="btn btn-small profile-btn"
+                      onClick={() => setShowCharacterProfileEditor(charId)}
+                      title="Change default profile for this session"
+                    >
+                      {profileInfo ? `${profileInfo.id} (${profileInfo.model})` : 'Default'}
+                      {' '}✏️
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      
       <div className="messages">
         {messages.map((msg, idx) => {
           const charInfo = getCharacterInfo(msg.sender_id);

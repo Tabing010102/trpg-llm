@@ -14,15 +14,19 @@ class AIAgentManager:
     Auto-creates agents for AI-controlled characters.
     """
     
-    def __init__(self, config: GameConfig):
+    def __init__(self, config: GameConfig, global_profile_registry: Optional[LLMProfileRegistry] = None):
         self.config = config
         self.agents: Dict[str, AIAgent] = {}
         
-        # Initialize profile registry
-        self.profile_registry = LLMProfileRegistry.from_config(
-            llm_config=config.llm_config,
-            llm_profiles=config.llm_profiles
-        )
+        # Use global profile registry if provided, otherwise create from config
+        if global_profile_registry is not None:
+            self.profile_registry = global_profile_registry
+        else:
+            # Fallback to creating registry from config (for backward compatibility)
+            self.profile_registry = LLMProfileRegistry.from_config(
+                llm_config=config.llm_config,
+                llm_profiles=config.llm_profiles
+            )
         
         self._initialize_agents()
     

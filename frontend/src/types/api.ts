@@ -127,3 +127,16 @@ export interface SessionHistoryResponse {
   session_id: string;
   events: Event[];
 }
+
+export interface SetCharacterProfileRequest {
+  profile_id: string;
+}
+
+export interface CharacterProfilesResponse {
+  session_id: string;
+  character_profiles: Record<string, string>;
+}
+
+export interface ProfilesResponse {
+  profiles: LLMProfile[];
+}

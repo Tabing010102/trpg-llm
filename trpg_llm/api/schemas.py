@@ -112,3 +112,8 @@ class EditEventResponse(BaseModel):
     session_id: str
     event_id: str
     current_state: Dict[str, Any]
+
+
+class SetCharacterProfileRequest(BaseModel):
+    """Request to set a character's profile for a session"""
+    profile_id: str = Field(..., description="Profile ID to use for this character")

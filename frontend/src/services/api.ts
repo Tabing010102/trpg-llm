@@ -9,6 +9,9 @@ import type {
   EditEventResponse,
   SessionHistoryResponse,
   GameState,
+  LLMProfile,
+  CharacterProfilesResponse,
+  ProfilesResponse,
 } from '../types/api';
 
 const API_BASE = '';  // Using proxy, no need for full URL
@@ -33,6 +36,65 @@ class ApiService {
 
     return response.json();
   }
+
+  // ===== Global Profile Management =====
+  
+  async getProfiles(): Promise<ProfilesResponse> {
+    return this.request<ProfilesResponse>(`${API_BASE}/api/v1/profiles`);
+  }
+
+  async setProfiles(profiles: LLMProfile[]): Promise<{ message: string; count: number }> {
+    return this.request<{ message: string; count: number }>(`${API_BASE}/api/v1/profiles`, {
+      method: 'POST',
+      body: JSON.stringify(profiles),
+    });
+  }
+
+  async addProfile(profile: LLMProfile): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`${API_BASE}/api/v1/profiles/add`, {
+      method: 'POST',
+      body: JSON.stringify(profile),
+    });
+  }
+
+  async deleteProfile(profileId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`${API_BASE}/api/v1/profiles/${profileId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ===== Session Character Profiles =====
+
+  async getSessionCharacterProfiles(sessionId: string): Promise<CharacterProfilesResponse> {
+    return this.request<CharacterProfilesResponse>(
+      `${API_BASE}/sessions/${sessionId}/character-profiles`
+    );
+  }
+
+  async setCharacterProfile(
+    sessionId: string,
+    characterId: string,
+    profileId: string
+  ): Promise<{ message: string; session_id: string; character_id: string; profile_id: string }> {
+    return this.request<{ message: string; session_id: string; character_id: string; profile_id: string }>(
+      `${API_BASE}/sessions/${sessionId}/character-profiles/${characterId}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({ profile_id: profileId }),
+      }
+    );
+  }
+
+  async resetCharacterProfile(sessionId: string, characterId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(
+      `${API_BASE}/sessions/${sessionId}/character-profiles/${characterId}`,
+      {
+        method: 'DELETE',
+      }
+    );
+  }
+
+  // ===== Session Management =====
 
   async createSession(config: Record<string, any>): Promise<CreateSessionResponse> {
     return this.request<CreateSessionResponse>(`${API_BASE}/sessions`, {

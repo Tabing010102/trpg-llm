@@ -4,11 +4,18 @@ import type { Character, LLMProfile } from '../types/api';
 interface ChatInputProps {
   characters: Record<string, Character>;
   llmProfiles: LLMProfile[];
+  sessionCharacterProfiles: Record<string, string>;
   onSend: (roleId: string, message: string, profileId?: string) => void;
   disabled: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ characters, llmProfiles, onSend, disabled }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ 
+  characters, 
+  llmProfiles, 
+  sessionCharacterProfiles,
+  onSend, 
+  disabled 
+}) => {
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [message, setMessage] = useState('');
   const [selectedProfile, setSelectedProfile] = useState<string>('');
@@ -41,6 +48,12 @@ const ChatInput: React.FC<ChatInputProps> = ({ characters, llmProfiles, onSend, 
   // Check if selected character is AI-controlled
   const selectedChar = characters[selectedRole];
   const isAICharacter = selectedChar?.control === 'ai';
+  
+  // Get the session's default profile for this character
+  const sessionDefaultProfile = selectedRole ? sessionCharacterProfiles[selectedRole] : undefined;
+  const sessionProfileInfo = sessionDefaultProfile 
+    ? llmProfiles.find(p => p.id === sessionDefaultProfile)
+    : undefined;
 
   return (
     <div className="chat-input">
@@ -77,7 +90,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ characters, llmProfiles, onSend, 
       </div>
       {isAICharacter && llmProfiles.length > 0 && (
         <div className="profile-selector-row">
-          <label htmlFor="profile-select">LLM Profile:</label>
+          <label htmlFor="profile-select">
+            LLM Profile (one-time override):
+          </label>
           <select
             id="profile-select"
             value={selectedProfile}
@@ -85,7 +100,12 @@ const ChatInput: React.FC<ChatInputProps> = ({ characters, llmProfiles, onSend, 
             disabled={disabled}
             className="profile-select"
           >
-            <option value="">Default (from character config)</option>
+            <option value="">
+              {sessionProfileInfo 
+                ? `Session Default: ${sessionProfileInfo.id} (${sessionProfileInfo.model})`
+                : 'Use Session/Game Default'
+              }
+            </option>
             {llmProfiles.map(profile => (
               <option key={profile.id} value={profile.id}>
                 {profile.id} - {profile.model} (temp: {profile.temperature})

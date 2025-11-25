@@ -2,40 +2,60 @@
 
 ## Overview
 
-LLM Profiles allow you to configure multiple LLM connections with different providers, models, and parameters, then route them to different characters or switch them dynamically at request time.
+LLM Profiles allow you to configure multiple LLM connections with different providers, models, and parameters. Profiles are configured at the **instance level** (globally) and can be assigned to characters in game presets. Each session can override the default profile for each character without affecting the game preset.
 
 ## Key Features
 
+- **Global Profile Configuration**: Profiles are instance-level configuration, shared across all game sessions
 - **Multiple Provider Support**: Configure OpenAI-compatible, Anthropic, Gemini, or local models
-- **Character-Level Routing**: Assign specific profiles to individual characters
+- **Game Preset Defaults**: Each character in a game preset can have a default profile
+- **Session-Level Overrides**: Each session can override character profiles without affecting the game preset
 - **Request-Level Override**: Switch profiles for individual chat requests
+- **Per-Message Tracking**: Each message stores which profile was used
 - **Regeneration Switching**: Use different profiles when regenerating AI messages
-- **Metadata Tracking**: Track which profile was used for each message
 - **Backward Compatibility**: Works with existing configurations without profiles
 
 ## Configuration
 
-### Basic Setup
+### Instance-Level Profile Setup (Global)
 
-Add `llm_profiles` to your game configuration:
+Profiles are managed through the API at the instance level:
 
-```yaml
-llm_config:
-  default_profile_id: "gpt3_fast"  # Fallback profile
+```python
+# Set global profiles via API
+POST /api/v1/profiles
+[
+  {
+    "id": "gpt3_fast",
+    "provider_type": "oai_compatible",
+    "model": "gpt-3.5-turbo",
+    "temperature": 0.7,
+    "api_key_ref": "OPENAI_API_KEY"
+  },
+  {
+    "id": "gpt4_smart",
+    "provider_type": "oai_compatible",
+    "model": "gpt-4",
+    "temperature": 0.5,
+    "max_tokens": 2000,
+    "api_key_ref": "OPENAI_API_KEY"
+  }
+]
 
-llm_profiles:
-  - id: "gpt3_fast"
-    provider_type: "oai_compatible"
-    model: "gpt-3.5-turbo"
-    temperature: 0.7
-    api_key_ref: "OPENAI_API_KEY"
-  
-  - id: "gpt4_smart"
-    provider_type: "oai_compatible"
-    model: "gpt-4"
-    temperature: 0.5
-    max_tokens: 2000
-    api_key_ref: "OPENAI_API_KEY"
+# Get all profiles
+GET /api/v1/profiles
+
+# Add a single profile
+POST /api/v1/profiles/add
+{
+  "id": "claude_creative",
+  "provider_type": "anthropic",
+  "model": "claude-3-opus-20240229",
+  "temperature": 0.9
+}
+
+# Delete a profile
+DELETE /api/v1/profiles/{profile_id}
 ```
 
 ### Profile Fields
@@ -78,6 +98,63 @@ characters:
 
 If no `profile_id` is specified, the `default_profile_id` from `llm_config` is used.
 
+## Session-Level Character Profile Overrides
+
+Each session can override the default profile for any character. This only affects subsequent messages in that session and does not modify the game preset.
+
+### Get Session Character Profiles
+
+```python
+GET /sessions/{session_id}/character-profiles
+
+# Response
+{
+  "session_id": "abc123",
+  "character_profiles": {
+    "gm": "gpt4_creative",
+    "npc1": "gpt3_fast"
+  }
+}
+```
+
+### Set Character Profile for Session
+
+```python
+PUT /sessions/{session_id}/character-profiles/{character_id}
+{
+  "profile_id": "gpt4_creative"
+}
+
+# Response
+{
+  "message": "Character 'gm' profile set to 'gpt4_creative'",
+  "session_id": "abc123",
+  "character_id": "gm",
+  "profile_id": "gpt4_creative"
+}
+```
+
+### Reset Character to Game Preset Default
+
+```python
+DELETE /sessions/{session_id}/character-profiles/{character_id}
+
+# Response
+{
+  "message": "Character 'gm' profile reset to default"
+}
+```
+
+## Profile Resolution Priority
+
+When determining which profile to use for a message, the system checks in this order:
+
+1. **Request-level override** (`llm_profile_id` in chat request) - highest priority
+2. **Session-level character override** (set via `/character-profiles` API)
+3. **Game preset default** (`ai_config.profile_id` in character definition)
+4. **Global default** (`default_profile_id` in `llm_config`)
+5. **Fallback** (default profile from legacy config)
+
 ## API Usage
 
 ### Chat with Default Profile
@@ -90,7 +167,7 @@ POST /api/v1/sessions/{session_id}/chat
 }
 ```
 
-The character's configured profile is used automatically.
+The character's configured profile is used automatically (following the priority order above).
 
 ### Chat with Override Profile
 
@@ -99,7 +176,7 @@ POST /api/v1/sessions/{session_id}/chat
 {
   "role_id": "gm",
   "message": "What do you see?",
-  "llm_profile_id": "gpt4_creative"  # Override to use creative profile
+  "llm_profile_id": "gpt4_creative"  # One-time override (highest priority)
 }
 ```
 

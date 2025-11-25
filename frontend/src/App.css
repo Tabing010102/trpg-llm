@@ -244,6 +244,61 @@ body {
   border-color: var(--accent-secondary);
 }
 
+/* Session Profile Settings */
+.session-profile-settings {
+  background-color: var(--bg-tertiary);
+  padding: 0.75rem;
+  margin: 0.5rem;
+  border-radius: 5px;
+  border: 1px solid var(--border-color);
+}
+
+.session-profile-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  margin-bottom: 0.5rem;
+  color: var(--text-highlight);
+}
+
+.session-profile-hint {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.session-profile-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.session-profile-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.session-profile-char {
+  color: var(--text-secondary);
+  min-width: 100px;
+}
+
+.profile-btn {
+  background-color: var(--bg-secondary);
+  border-color: var(--accent-success);
+  color: var(--accent-success);
+}
+
+.profile-btn:hover {
+  background-color: var(--accent-success);
+  color: var(--bg-primary);
+}
+
+.profile-selector.inline {
+  display: inline-flex;
+}
+
 /* Chat Input */
 .chat-input {
   background-color: var(--bg-secondary);

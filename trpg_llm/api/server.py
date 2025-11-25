@@ -27,6 +27,7 @@ from .schemas import (
     RedrawMessageRequest,
     EditEventRequest,
     EditEventResponse,
+    SetCharacterProfileRequest,
 )
 
 
@@ -34,6 +35,13 @@ from .schemas import (
 GAME_SESSIONS: Dict[str, GameEngine] = {}
 CHAT_PIPELINES: Dict[str, ChatPipeline] = {}
 AGENT_MANAGERS: Dict[str, AIAgentManager] = {}
+
+# Global LLM profile registry (instance-level configuration)
+from ..llm.profile import LLMProfileRegistry, LLMProfile
+GLOBAL_PROFILE_REGISTRY: Optional[LLMProfileRegistry] = None
+
+# Per-session character profile overrides: {session_id: {character_id: profile_id}}
+SESSION_CHARACTER_PROFILES: Dict[str, Dict[str, str]] = {}
 
 
 def create_app() -> FastAPI:
@@ -63,6 +71,90 @@ def create_app() -> FastAPI:
             "status": "running",
         }
     
+    # ===== Global LLM Profile Management =====
+    
+    @app.get("/api/v1/profiles")
+    async def list_profiles():
+        """List all global LLM profiles"""
+        global GLOBAL_PROFILE_REGISTRY
+        if GLOBAL_PROFILE_REGISTRY is None:
+            return {"profiles": []}
+        
+        profiles = []
+        for profile_id in GLOBAL_PROFILE_REGISTRY.list_profiles():
+            profile = GLOBAL_PROFILE_REGISTRY.get_profile(profile_id)
+            if profile:
+                profiles.append(profile.dict())
+        
+        return {"profiles": profiles}
+    
+    @app.post("/api/v1/profiles")
+    async def set_profiles(profiles: list):
+        """Set global LLM profiles (replaces all existing profiles)"""
+        global GLOBAL_PROFILE_REGISTRY
+        GLOBAL_PROFILE_REGISTRY = LLMProfileRegistry(profiles)
+        return {"message": "Profiles updated", "count": len(profiles)}
+    
+    @app.post("/api/v1/profiles/add")
+    async def add_profile(profile: dict):
+        """Add a single profile to the global registry"""
+        global GLOBAL_PROFILE_REGISTRY
+        if GLOBAL_PROFILE_REGISTRY is None:
+            GLOBAL_PROFILE_REGISTRY = LLMProfileRegistry([profile])
+        else:
+            new_profile = LLMProfile(**profile)
+            GLOBAL_PROFILE_REGISTRY.profiles[new_profile.id] = new_profile
+        return {"message": f"Profile '{profile.get('id')}' added"}
+    
+    @app.delete("/api/v1/profiles/{profile_id}")
+    async def delete_profile(profile_id: str):
+        """Delete a profile from the global registry"""
+        global GLOBAL_PROFILE_REGISTRY
+        if GLOBAL_PROFILE_REGISTRY and profile_id in GLOBAL_PROFILE_REGISTRY.profiles:
+            del GLOBAL_PROFILE_REGISTRY.profiles[profile_id]
+            return {"message": f"Profile '{profile_id}' deleted"}
+        raise HTTPException(status_code=404, detail="Profile not found")
+    
+    # ===== Session Character Profile Overrides =====
+    
+    @app.get("/sessions/{session_id}/character-profiles")
+    async def get_session_character_profiles(session_id: str):
+        """Get character profile overrides for a session"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        return {"session_id": session_id, "character_profiles": SESSION_CHARACTER_PROFILES.get(session_id, {})}
+    
+    @app.put("/sessions/{session_id}/character-profiles/{character_id}")
+    async def set_character_profile(session_id: str, character_id: str, request: SetCharacterProfileRequest):
+        """Set or update the default profile for a character in a session"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        # Initialize session character profiles if not exists
+        if session_id not in SESSION_CHARACTER_PROFILES:
+            SESSION_CHARACTER_PROFILES[session_id] = {}
+        
+        SESSION_CHARACTER_PROFILES[session_id][character_id] = request.profile_id
+        return {
+            "message": f"Character '{character_id}' profile set to '{request.profile_id}'",
+            "session_id": session_id,
+            "character_id": character_id,
+            "profile_id": request.profile_id
+        }
+    
+    @app.delete("/sessions/{session_id}/character-profiles/{character_id}")
+    async def reset_character_profile(session_id: str, character_id: str):
+        """Reset a character's profile to use the game preset default"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id in SESSION_CHARACTER_PROFILES and character_id in SESSION_CHARACTER_PROFILES[session_id]:
+            del SESSION_CHARACTER_PROFILES[session_id][character_id]
+            return {"message": f"Character '{character_id}' profile reset to default"}
+        
+        return {"message": f"Character '{character_id}' was already using default profile"}
+    
     @app.post("/sessions", response_model=CreateSessionResponse)
     async def create_session(request: CreateSessionRequest):
         """Create a new game session"""
@@ -72,8 +164,8 @@ def create_app() -> FastAPI:
             config = GameConfig(**request.config)
             engine = GameEngine(config, session_id)
             
-            # Create AI agent manager
-            agent_manager = AIAgentManager(config)
+            # Create AI agent manager with global profile registry
+            agent_manager = AIAgentManager(config, global_profile_registry=GLOBAL_PROFILE_REGISTRY)
             
             # Create tool registry and chat pipeline
             tool_registry = create_builtin_tools_registry()
@@ -83,6 +175,9 @@ def create_app() -> FastAPI:
             GAME_SESSIONS[session_id] = engine
             AGENT_MANAGERS[session_id] = agent_manager
             CHAT_PIPELINES[session_id] = chat_pipeline
+            
+            # Initialize session character profiles (empty - use game preset defaults)
+            SESSION_CHARACTER_PROFILES[session_id] = {}
             
             # Get initial state
             state = engine.get_state()
@@ -249,6 +344,8 @@ def create_app() -> FastAPI:
             del CHAT_PIPELINES[session_id]
         if session_id in AGENT_MANAGERS:
             del AGENT_MANAGERS[session_id]
+        if session_id in SESSION_CHARACTER_PROFILES:
+            del SESSION_CHARACTER_PROFILES[session_id]
         
         return {"message": "Session deleted", "session_id": session_id}
     
@@ -264,12 +361,21 @@ def create_app() -> FastAPI:
         try:
             pipeline = CHAT_PIPELINES[session_id]
             
+            # Determine which profile to use:
+            # 1. Request-level override (highest priority)
+            # 2. Session-level character override
+            # 3. Game preset default (handled by pipeline)
+            profile_id = request.llm_profile_id
+            if not profile_id:
+                session_profiles = SESSION_CHARACTER_PROFILES.get(session_id, {})
+                profile_id = session_profiles.get(request.role_id)
+            
             result = await pipeline.process_chat(
                 role_id=request.role_id,
                 message=request.message,
                 template=request.template,
                 max_tool_iterations=request.max_tool_iterations,
-                llm_profile_id=request.llm_profile_id
+                llm_profile_id=profile_id
             )
             
             return ChatResponse(**result)
@@ -289,7 +395,11 @@ def create_app() -> FastAPI:
             engine = GAME_SESSIONS[session_id]
             pipeline = CHAT_PIPELINES[session_id]
             
-            # Get the profile_id from the last message if not specified
+            # Determine which profile to use:
+            # 1. Request-level override (highest priority)
+            # 2. Try to get from last message metadata
+            # 3. Session-level character override
+            # 4. Game preset default (handled by pipeline)
             profile_id_to_use = request.llm_profile_id
             if not profile_id_to_use:
                 # Try to get from last message metadata
@@ -299,6 +409,11 @@ def create_app() -> FastAPI:
                         if event.metadata and "used_profile_id" in event.metadata:
                             profile_id_to_use = event.metadata["used_profile_id"]
                         break
+            
+            if not profile_id_to_use:
+                # Fallback to session character profile override
+                session_profiles = SESSION_CHARACTER_PROFILES.get(session_id, {})
+                profile_id_to_use = session_profiles.get(request.character_id)
             
             # Rollback to before the last message
             state = engine.redraw_last_ai_message(request.character_id)
