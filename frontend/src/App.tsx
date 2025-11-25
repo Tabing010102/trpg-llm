@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import TopNav from './components/TopNav';
 import ChatWindow from './components/ChatWindow';
 import ChatInput from './components/ChatInput';
@@ -6,7 +6,7 @@ import StatePanel from './components/StatePanel';
 import StateDiffsPanel from './components/StateDiffsPanel';
 import DebugPanel from './components/DebugPanel';
 import { apiService } from './services/api';
-import type { GameState, StateDiff, Event } from './types/api';
+import type { GameState, StateDiff, Event, LLMProfile } from './types/api';
 import './App.css';
 
 // Default configuration for new sessions (using simple_game.json as reference)
@@ -78,6 +78,43 @@ function App() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Global profiles (instance-level configuration)
+  const [globalProfiles, setGlobalProfiles] = useState<LLMProfile[]>([]);
+  
+  // Per-session character profile overrides
+  const [sessionCharacterProfiles, setSessionCharacterProfiles] = useState<Record<string, string>>({});
+
+  // Fetch global profiles on mount
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        const response = await apiService.getProfiles();
+        setGlobalProfiles(response.profiles);
+      } catch {
+        // Profiles may not be configured yet, that's ok
+      }
+    };
+    fetchProfiles();
+  }, []);
+
+  // Fetch session character profiles when session changes
+  useEffect(() => {
+    if (!sessionId) {
+      setSessionCharacterProfiles({});
+      return;
+    }
+    
+    const fetchCharacterProfiles = async () => {
+      try {
+        const response = await apiService.getSessionCharacterProfiles(sessionId);
+        setSessionCharacterProfiles(response.character_profiles);
+      } catch {
+        // May not have any overrides yet
+      }
+    };
+    fetchCharacterProfiles();
+  }, [sessionId]);
 
   const showError = (message: string) => {
     setError(message);
@@ -92,6 +129,7 @@ function App() {
       setGameState(response.state);
       setRecentDiffs([]);
       setEvents([]);
+      setSessionCharacterProfiles({});
       showError('Session created successfully!');
     } catch (err) {
       showError('Failed to create session: ' + (err as Error).message);
@@ -100,7 +138,32 @@ function App() {
     }
   };
 
-  const handleSendMessage = async (roleId: string, message: string) => {
+  const handleSetCharacterProfile = async (characterId: string, profileId: string | null) => {
+    if (!sessionId) return;
+    
+    setLoading(true);
+    try {
+      if (profileId) {
+        await apiService.setCharacterProfile(sessionId, characterId, profileId);
+        setSessionCharacterProfiles(prev => ({ ...prev, [characterId]: profileId }));
+        showError(`Character '${characterId}' profile set to '${profileId}'`);
+      } else {
+        await apiService.resetCharacterProfile(sessionId, characterId);
+        setSessionCharacterProfiles(prev => {
+          const newProfiles = { ...prev };
+          delete newProfiles[characterId];
+          return newProfiles;
+        });
+        showError(`Character '${characterId}' profile reset to default`);
+      }
+    } catch (err) {
+      showError('Failed to update character profile: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (roleId: string, message: string, profileId?: string) => {
     if (!sessionId) return;
     
     setLoading(true);
@@ -108,6 +171,7 @@ function App() {
       const response = await apiService.chat(sessionId, {
         role_id: roleId,
         message,
+        llm_profile_id: profileId,
       });
 
       if (response.error) {
@@ -124,13 +188,14 @@ function App() {
     }
   };
 
-  const handleRedraw = async (characterId: string) => {
+  const handleRedraw = async (characterId: string, profileId?: string) => {
     if (!sessionId) return;
 
     setLoading(true);
     try {
       const response = await apiService.redrawMessage(sessionId, {
         character_id: characterId,
+        llm_profile_id: profileId,
       });
 
       if (response.error) {
@@ -197,10 +262,15 @@ function App() {
           <ChatWindow
             messages={gameState?.messages || []}
             characters={gameState?.characters || {}}
+            llmProfiles={globalProfiles}
+            sessionCharacterProfiles={sessionCharacterProfiles}
             onRedraw={handleRedraw}
+            onSetCharacterProfile={handleSetCharacterProfile}
           />
           <ChatInput
             characters={gameState?.characters || {}}
+            llmProfiles={globalProfiles}
+            sessionCharacterProfiles={sessionCharacterProfiles}
             onSend={handleSendMessage}
             disabled={loading || !sessionId}
           />

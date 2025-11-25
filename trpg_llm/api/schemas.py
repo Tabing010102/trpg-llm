@@ -78,6 +78,7 @@ class ChatRequest(BaseModel):
     message: Optional[str] = Field(None, description="Message content (required for humans)")
     template: Optional[str] = Field(None, description="Optional Jinja2 template for prompt")
     max_tool_iterations: int = Field(3, description="Max tool calling iterations")
+    llm_profile_id: Optional[str] = Field(None, description="Optional LLM profile ID to use for this request")
 
 
 class ChatResponse(BaseModel):
@@ -89,12 +90,14 @@ class ChatResponse(BaseModel):
     role_id: str = Field(..., description="Character ID")
     is_ai: bool = Field(..., description="Whether this is an AI character")
     error: Optional[str] = Field(None, description="Error message if any")
+    used_profile_id: Optional[str] = Field(None, description="Profile ID actually used for this message")
 
 
 class RedrawMessageRequest(BaseModel):
     """Request to redraw last AI message"""
     character_id: str = Field(..., description="AI character whose message to redraw")
     template: Optional[str] = Field(None, description="Optional template for regeneration")
+    llm_profile_id: Optional[str] = Field(None, description="Optional LLM profile ID for regeneration")
 
 
 class EditEventRequest(BaseModel):
@@ -109,3 +112,8 @@ class EditEventResponse(BaseModel):
     session_id: str
     event_id: str
     current_state: Dict[str, Any]
+
+
+class SetCharacterProfileRequest(BaseModel):
+    """Request to set a character's profile for a session"""
+    profile_id: str = Field(..., description="Profile ID to use for this character")

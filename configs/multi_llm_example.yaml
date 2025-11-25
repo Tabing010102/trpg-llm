@@ -1,0 +1,159 @@
+# Example configuration showcasing multi-LLM profile support
+# This demonstrates how to configure multiple LLM providers and route them to different characters
+
+name: "Multi-LLM Adventure"
+rule_system: "generic"
+description: "A game demonstrating multiple LLM profiles with different providers and models"
+
+# Character definitions
+characters:
+  gm:
+    id: "gm"
+    name: "Game Master"
+    type: "gm"
+    control: "ai"
+    description: "The Game Master controlling the narrative, using a powerful model"
+    ai_config:
+      # GM uses the advanced model profile
+      profile_id: "gpt4_creative"
+  
+  investigator:
+    id: "investigator"
+    name: "Detective Jane"
+    type: "player"
+    control: "ai"
+    description: "A sharp-minded detective with analytical skills"
+    ai_config:
+      # Investigator uses precise model for logical thinking
+      profile_id: "gpt4_precise"
+  
+  sidekick:
+    id: "sidekick"
+    name: "Watson"
+    type: "npc"
+    control: "ai"
+    description: "A helpful companion"
+    ai_config:
+      # Sidekick uses a faster, cheaper model
+      profile_id: "gpt3_fast"
+  
+  player1:
+    id: "player1"
+    name: "Human Player"
+    type: "player"
+    control: "human"
+    description: "Human controlled character"
+
+# LLM configuration
+llm_config:
+  # Default profile ID for characters without explicit profile
+  default_profile_id: "gpt3_fast"
+  
+  # Traditional prompt templates
+  prompts:
+    gm_system: |
+      You are an engaging Game Master for a mystery adventure.
+      Create vivid descriptions and maintain suspense.
+      Guide the investigation but let players make discoveries.
+    
+    player_system: |
+      You are a detective character investigating a mystery.
+      Use logical thinking and observation skills.
+      Ask thoughtful questions and follow clues.
+
+# LLM Profiles - Multiple provider configurations
+llm_profiles:
+  # Fast model for routine interactions
+  - id: "gpt3_fast"
+    provider_type: "oai_compatible"
+    model: "gpt-3.5-turbo"
+    temperature: 0.7
+    max_tokens: 1000
+    api_key_ref: "OPENAI_API_KEY"
+  
+  # Creative model for narrative generation
+  - id: "gpt4_creative"
+    provider_type: "oai_compatible"
+    model: "gpt-4"
+    temperature: 0.9
+    top_p: 0.95
+    max_tokens: 2000
+    context_window: 8192
+    api_key_ref: "OPENAI_API_KEY"
+    extra_params:
+      presence_penalty: 0.2
+      frequency_penalty: 0.3
+  
+  # Precise model for logical reasoning
+  - id: "gpt4_precise"
+    provider_type: "oai_compatible"
+    model: "gpt-4"
+    temperature: 0.3
+    top_p: 0.9
+    max_tokens: 1500
+    api_key_ref: "OPENAI_API_KEY"
+  
+  # Example: Claude model (if you have Anthropic API access)
+  - id: "claude_narrative"
+    provider_type: "anthropic"
+    model: "claude-2"
+    base_url: "https://api.anthropic.com"
+    temperature: 0.8
+    max_tokens: 2000
+    api_key_ref: "ANTHROPIC_API_KEY"
+  
+  # Example: Local model (e.g., running via LM Studio or Ollama)
+  - id: "local_llama"
+    provider_type: "local_openai"
+    model: "llama2"
+    base_url: "http://localhost:1234/v1"
+    temperature: 0.7
+    max_tokens: 1000
+    # No api_key_ref needed for local models
+
+# Workflow configuration
+workflow:
+  turn_order:
+    - gm
+    - investigator
+    - sidekick
+    - player1
+
+# Available tools/actions
+tools:
+  - name: "investigate_location"
+    description: "Investigate a specific location for clues"
+    parameters:
+      location:
+        type: "string"
+        description: "The location to investigate"
+  
+  - name: "question_character"
+    description: "Ask questions to an NPC"
+    parameters:
+      character:
+        type: "string"
+        description: "The character to question"
+      question:
+        type: "string"
+        description: "The question to ask"
+  
+  - name: "roll_dice"
+    description: "Roll dice for skill checks"
+    parameters:
+      notation:
+        type: "string"
+        description: "Dice notation (e.g., '1d20', '2d6+3')"
+
+# Initial game state
+initial_state:
+  location: "Detective Agency"
+  time: "Morning"
+  case_status: "just_started"
+  clues_found: []
+  
+# Usage notes:
+# - Characters automatically use their configured profile
+# - You can override at request time by specifying llm_profile_id in the API
+# - When regenerating messages, you can switch to a different profile
+# - Metadata tracks which profile was used for each AI response

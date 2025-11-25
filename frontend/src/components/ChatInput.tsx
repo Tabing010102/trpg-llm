@@ -1,19 +1,28 @@
 import React, { useState } from 'react';
-import type { Character } from '../types/api';
+import type { Character, LLMProfile } from '../types/api';
 
 interface ChatInputProps {
   characters: Record<string, Character>;
-  onSend: (roleId: string, message: string) => void;
+  llmProfiles: LLMProfile[];
+  sessionCharacterProfiles: Record<string, string>;
+  onSend: (roleId: string, message: string, profileId?: string) => void;
   disabled: boolean;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ characters, onSend, disabled }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ 
+  characters, 
+  llmProfiles, 
+  sessionCharacterProfiles,
+  onSend, 
+  disabled 
+}) => {
   const [selectedRole, setSelectedRole] = useState<string>('');
   const [message, setMessage] = useState('');
+  const [selectedProfile, setSelectedProfile] = useState<string>('');
 
   const handleSend = () => {
     if (!selectedRole || !message.trim()) return;
-    onSend(selectedRole, message);
+    onSend(selectedRole, message, selectedProfile || undefined);
     setMessage('');
   };
 
@@ -36,6 +45,24 @@ const ChatInput: React.FC<ChatInputProps> = ({ characters, onSend, disabled }) =
     }
   }, [humanCharacters, selectedRole]);
 
+  // Check if selected character is AI-controlled
+  const selectedChar = characters[selectedRole];
+  const isAICharacter = selectedChar?.control === 'ai';
+  
+  // Get the session's default profile for this character
+  const sessionDefaultProfile = selectedRole ? sessionCharacterProfiles[selectedRole] : undefined;
+  const sessionProfileInfo = sessionDefaultProfile 
+    ? llmProfiles.find(p => p.id === sessionDefaultProfile)
+    : undefined;
+
+  // Helper to get the default option label for profile selector
+  const getDefaultOptionLabel = (): string => {
+    if (sessionProfileInfo) {
+      return `Session Default: ${sessionProfileInfo.id} (${sessionProfileInfo.model})`;
+    }
+    return 'Use Session/Game Default';
+  };
+
   return (
     <div className="chat-input">
       <div className="input-row">
@@ -48,7 +75,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ characters, onSend, disabled }) =
           <option value="">Select Role</option>
           {Object.values(characters).map((char) => (
             <option key={char.id} value={char.id}>
-              {char.name} ({char.type})
+              {char.name} ({char.type}) {char.control === 'ai' ? '🤖' : ''}
             </option>
           ))}
         </select>
@@ -69,6 +96,29 @@ const ChatInput: React.FC<ChatInputProps> = ({ characters, onSend, disabled }) =
           Send
         </button>
       </div>
+      {isAICharacter && llmProfiles.length > 0 && (
+        <div className="profile-selector-row">
+          <label htmlFor="profile-select">
+            LLM Profile (one-time override):
+          </label>
+          <select
+            id="profile-select"
+            value={selectedProfile}
+            onChange={(e) => setSelectedProfile(e.target.value)}
+            disabled={disabled}
+            className="profile-select"
+          >
+            <option value="">
+              {getDefaultOptionLabel()}
+            </option>
+            {llmProfiles.map(profile => (
+              <option key={profile.id} value={profile.id}>
+                {profile.id} - {profile.model} (temp: {profile.temperature})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
     </div>
   );
 };
