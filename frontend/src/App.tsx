@@ -325,7 +325,7 @@ function App() {
 
       setGameState(response.state);
       setLastDiceResult(response.result);
-      showNotification(`Rolled ${notation}: ${response.result.total}`);
+      showNotification(`Rolled ${notation}: ${response.result.final_result}`);
     } catch (err) {
       showNotification('Failed to roll dice: ' + (err as Error).message);
     } finally {
