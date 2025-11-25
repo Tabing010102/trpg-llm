@@ -5,7 +5,8 @@ interface DebugPanelProps {
   sessionId: string | null;
   events: Event[];
   onRefreshEvents: () => void;
-  onEditEvent: (eventId: string, newData: Record<string, any>) => void;
+  onEditEvent: (eventId: string, newData: Record<string, unknown>) => void;
+  onRollbackToEvent: (eventId: string) => void;
 }
 
 const DebugPanel: React.FC<DebugPanelProps> = ({
@@ -13,6 +14,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
   events,
   onRefreshEvents,
   onEditEvent,
+  onRollbackToEvent,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -40,6 +42,12 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
     setEditData('');
   };
 
+  const handleRollback = (eventId: string) => {
+    if (window.confirm('Are you sure you want to rollback to this event? All events after this will be removed.')) {
+      onRollbackToEvent(eventId);
+    }
+  };
+
   return (
     <div className="debug-panel">
       <div className="panel-header" onClick={() => setExpanded(!expanded)}>
@@ -64,7 +72,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
               <p className="text-muted">No events</p>
             ) : (
               <div className="events-table">
-                {events.map((event) => (
+                {events.map((event, index) => (
                   <div key={event.id} className="event-row">
                     {editingEventId === event.id ? (
                       <div className="event-edit-form">
@@ -90,7 +98,7 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
                       <>
                         <div className="event-info">
                           <div className="event-id">
-                            <strong>ID:</strong> {event.id.slice(0, 8)}...
+                            <strong>#{index + 1}</strong> - {event.id.slice(0, 8)}...
                           </div>
                           <div className="event-type">
                             <strong>Type:</strong> {event.type}
@@ -112,9 +120,19 @@ const DebugPanel: React.FC<DebugPanelProps> = ({
                           <button
                             className="btn btn-small"
                             onClick={() => handleStartEdit(event)}
+                            title="Edit event data"
                           >
-                            ✏️ Edit
+                            ✏️
                           </button>
+                          {index < events.length - 1 && (
+                            <button
+                              className="btn btn-small btn-warning"
+                              onClick={() => handleRollback(event.id)}
+                              title="Rollback to this event (removes all events after this)"
+                            >
+                              ⏪
+                            </button>
+                          )}
                         </div>
                       </>
                     )}
