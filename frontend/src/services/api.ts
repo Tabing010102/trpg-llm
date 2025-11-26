@@ -12,6 +12,11 @@ import type {
   LLMProfile,
   CharacterProfilesResponse,
   ProfilesResponse,
+  DiceRollRequest,
+  DiceRollResponse,
+  RollbackRequest,
+  RollbackResponse,
+  GameConfig,
 } from '../types/api';
 
 const API_BASE = '';  // Using proxy, no need for full URL
@@ -156,6 +161,40 @@ class ApiService {
         method: 'DELETE',
       }
     );
+  }
+
+  // ===== Dice Roll =====
+
+  async rollDice(sessionId: string, request: DiceRollRequest): Promise<DiceRollResponse> {
+    return this.request<DiceRollResponse>(
+      `${API_BASE}/sessions/${sessionId}/dice`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      }
+    );
+  }
+
+  // ===== Rollback =====
+
+  async rollback(sessionId: string, request: RollbackRequest): Promise<RollbackResponse> {
+    return this.request<RollbackResponse>(
+      `${API_BASE}/sessions/${sessionId}/rollback`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      }
+    );
+  }
+
+  // ===== Game Configuration =====
+
+  // Note: This creates a session with a provided config (for loading presets)
+  async createSessionWithConfig(config: GameConfig): Promise<CreateSessionResponse> {
+    return this.request<CreateSessionResponse>(`${API_BASE}/sessions`, {
+      method: 'POST',
+      body: JSON.stringify({ config }),
+    });
   }
 }
 

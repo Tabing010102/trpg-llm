@@ -140,3 +140,82 @@ export interface CharacterProfilesResponse {
 export interface ProfilesResponse {
   profiles: LLMProfile[];
 }
+
+// Dice roll types
+export interface DiceRollRequest {
+  notation: string;
+  reason?: string;
+  character_id?: string;
+  modifier?: number;
+  difficulty?: string;
+  target_value?: number;
+}
+
+export interface DiceRollResponse {
+  session_id: string;
+  result: DiceRollResult;
+  state: GameState;
+}
+
+export interface DiceRollResult {
+  notation: string;
+  rolls: number[];
+  modifier: number;
+  total: number;
+  final_result: number;
+  success?: boolean | null;
+  success_level?: string | null;
+  critical_success?: boolean | null;
+  critical_failure?: boolean | null;
+  reason?: string | null;
+  character_id?: string | null;
+}
+
+// Rollback types
+export interface RollbackRequest {
+  event_id?: string;
+  timestamp?: string;
+}
+
+export interface RollbackResponse {
+  session_id: string;
+  state: GameState;
+}
+
+// Game config type for loading presets
+export interface GameConfig {
+  name: string;
+  rule_system: string;
+  description?: string;
+  characters: Record<string, Character>;
+  llm_config?: LLMConfig;
+  llm_profiles?: LLMProfile[];
+  workflow?: WorkflowConfig;
+  tools?: ToolConfig[];
+  initial_state?: Record<string, unknown>;
+}
+
+export interface LLMConfig {
+  default_model?: string;
+  temperature?: number;
+  max_tokens?: number;
+  prompts?: Record<string, string>;
+}
+
+export interface WorkflowConfig {
+  turn_order?: string[];
+  phases?: string[];
+}
+
+export interface ToolConfig {
+  name: string;
+  description: string;
+  parameters: Record<string, ToolParameter>;
+}
+
+export interface ToolParameter {
+  type: string;
+  description?: string;
+  enum?: string[];
+  default?: string | number | boolean;
+}

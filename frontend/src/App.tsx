@@ -5,12 +5,15 @@ import ChatInput from './components/ChatInput';
 import StatePanel from './components/StatePanel';
 import StateDiffsPanel from './components/StateDiffsPanel';
 import DebugPanel from './components/DebugPanel';
+import ProfileManager from './components/ProfileManager';
+import GamePresetLoader from './components/GamePresetLoader';
+import DiceRoller from './components/DiceRoller';
 import { apiService } from './services/api';
-import type { GameState, StateDiff, Event, LLMProfile } from './types/api';
+import type { GameState, StateDiff, Event, LLMProfile, GameConfig, DiceRollResult } from './types/api';
 import './App.css';
 
 // Default configuration for new sessions (using simple_game.json as reference)
-const DEFAULT_CONFIG = {
+const DEFAULT_CONFIG: GameConfig = {
   name: 'Demo Adventure',
   rule_system: 'generic',
   description: 'A demo adventure for testing the frontend',
@@ -85,6 +88,13 @@ function App() {
   // Per-session character profile overrides
   const [sessionCharacterProfiles, setSessionCharacterProfiles] = useState<Record<string, string>>({});
 
+  // Modal states
+  const [showProfileManager, setShowProfileManager] = useState(false);
+  const [showPresetLoader, setShowPresetLoader] = useState(false);
+
+  // Dice roll state
+  const [lastDiceResult, setLastDiceResult] = useState<DiceRollResult | null>(null);
+
   // Fetch global profiles on mount
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -116,7 +126,7 @@ function App() {
     fetchCharacterProfiles();
   }, [sessionId]);
 
-  const showError = (message: string) => {
+  const showNotification = (message: string) => {
     setError(message);
     setTimeout(() => setError(null), 5000);
   };
@@ -130,9 +140,93 @@ function App() {
       setRecentDiffs([]);
       setEvents([]);
       setSessionCharacterProfiles({});
-      showError('Session created successfully!');
+      setLastDiceResult(null);
+      showNotification('Session created successfully!');
     } catch (err) {
-      showError('Failed to create session: ' + (err as Error).message);
+      showNotification('Failed to create session: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteSession = async () => {
+    if (!sessionId) return;
+    
+    if (!window.confirm('Are you sure you want to delete this session?')) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await apiService.deleteSession(sessionId);
+      setSessionId(null);
+      setGameState(null);
+      setRecentDiffs([]);
+      setEvents([]);
+      setSessionCharacterProfiles({});
+      setLastDiceResult(null);
+      showNotification('Session deleted successfully!');
+    } catch (err) {
+      showNotification('Failed to delete session: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoadPreset = async (config: GameConfig) => {
+    setLoading(true);
+    try {
+      const response = await apiService.createSessionWithConfig(config);
+      setSessionId(response.session_id);
+      setGameState(response.state);
+      setRecentDiffs([]);
+      setEvents([]);
+      setSessionCharacterProfiles({});
+      setLastDiceResult(null);
+      setShowPresetLoader(false);
+      showNotification(`Session created with preset: ${config.name}`);
+    } catch (err) {
+      showNotification('Failed to create session with preset: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Profile management handlers
+  const handleLoadProfiles = async (profiles: LLMProfile[]) => {
+    setLoading(true);
+    try {
+      await apiService.setProfiles(profiles);
+      setGlobalProfiles(profiles);
+      showNotification(`Loaded ${profiles.length} profiles successfully!`);
+    } catch (err) {
+      showNotification('Failed to load profiles: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddProfile = async (profile: LLMProfile) => {
+    setLoading(true);
+    try {
+      await apiService.addProfile(profile);
+      setGlobalProfiles(prev => [...prev, profile]);
+      showNotification(`Profile '${profile.id}' added successfully!`);
+    } catch (err) {
+      showNotification('Failed to add profile: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteProfile = async (profileId: string) => {
+    setLoading(true);
+    try {
+      await apiService.deleteProfile(profileId);
+      setGlobalProfiles(prev => prev.filter(p => p.id !== profileId));
+      showNotification(`Profile '${profileId}' deleted successfully!`);
+    } catch (err) {
+      showNotification('Failed to delete profile: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -146,7 +240,7 @@ function App() {
       if (profileId) {
         await apiService.setCharacterProfile(sessionId, characterId, profileId);
         setSessionCharacterProfiles(prev => ({ ...prev, [characterId]: profileId }));
-        showError(`Character '${characterId}' profile set to '${profileId}'`);
+        showNotification(`Character '${characterId}' profile set to '${profileId}'`);
       } else {
         await apiService.resetCharacterProfile(sessionId, characterId);
         setSessionCharacterProfiles(prev => {
@@ -154,10 +248,10 @@ function App() {
           delete newProfiles[characterId];
           return newProfiles;
         });
-        showError(`Character '${characterId}' profile reset to default`);
+        showNotification(`Character '${characterId}' profile reset to default`);
       }
     } catch (err) {
-      showError('Failed to update character profile: ' + (err as Error).message);
+      showNotification('Failed to update character profile: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -175,14 +269,14 @@ function App() {
       });
 
       if (response.error) {
-        showError('Chat error: ' + response.error);
+        showNotification('Chat error: ' + response.error);
       }
 
       // Update state with response
       setGameState(response.current_state);
       setRecentDiffs(response.state_diffs);
     } catch (err) {
-      showError('Failed to send message: ' + (err as Error).message);
+      showNotification('Failed to send message: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -199,14 +293,41 @@ function App() {
       });
 
       if (response.error) {
-        showError('Redraw error: ' + response.error);
+        showNotification('Redraw error: ' + response.error);
       }
 
       // Update state with response
       setGameState(response.current_state);
       setRecentDiffs(response.state_diffs);
     } catch (err) {
-      showError('Failed to redraw message: ' + (err as Error).message);
+      showNotification('Failed to redraw message: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRollDice = async (
+    notation: string,
+    characterId?: string,
+    reason?: string,
+    modifier?: number
+  ) => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const response = await apiService.rollDice(sessionId, {
+        notation,
+        character_id: characterId,
+        reason,
+        modifier,
+      });
+
+      setGameState(response.state);
+      setLastDiceResult(response.result);
+      showNotification(`Rolled ${notation}: ${response.result.final_result}`);
+    } catch (err) {
+      showNotification('Failed to roll dice: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -219,11 +340,11 @@ function App() {
       const response = await apiService.getHistory(sessionId);
       setEvents(response.events);
     } catch (err) {
-      showError('Failed to fetch events: ' + (err as Error).message);
+      showNotification('Failed to fetch events: ' + (err as Error).message);
     }
   };
 
-  const handleEditEvent = async (eventId: string, newData: Record<string, any>) => {
+  const handleEditEvent = async (eventId: string, newData: Record<string, unknown>) => {
     if (!sessionId) return;
 
     setLoading(true);
@@ -239,9 +360,28 @@ function App() {
       // Refresh events
       await handleRefreshEvents();
       
-      showError('Event edited successfully!');
+      showNotification('Event edited successfully!');
     } catch (err) {
-      showError('Failed to edit event: ' + (err as Error).message);
+      showNotification('Failed to edit event: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRollbackToEvent = async (eventId: string) => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const response = await apiService.rollback(sessionId, { event_id: eventId });
+      setGameState(response.state);
+      
+      // Refresh events
+      await handleRefreshEvents();
+      
+      showNotification('Rollback successful!');
+    } catch (err) {
+      showNotification('Failed to rollback: ' + (err as Error).message);
     } finally {
       setLoading(false);
     }
@@ -249,7 +389,13 @@ function App() {
 
   return (
     <div className="app">
-      <TopNav sessionId={sessionId} onNewSession={handleNewSession} />
+      <TopNav 
+        sessionId={sessionId} 
+        onNewSession={handleNewSession}
+        onOpenProfileManager={() => setShowProfileManager(true)}
+        onOpenPresetLoader={() => setShowPresetLoader(true)}
+        onDeleteSession={handleDeleteSession}
+      />
       
       {error && (
         <div className="error-toast">
@@ -278,15 +424,41 @@ function App() {
 
         <div className="right-panel">
           <StatePanel gameState={gameState} />
+          <DiceRoller
+            characters={gameState?.characters || {}}
+            sessionId={sessionId}
+            onRollDice={handleRollDice}
+            lastResult={lastDiceResult}
+            disabled={loading}
+          />
           <StateDiffsPanel diffs={recentDiffs} />
           <DebugPanel
             sessionId={sessionId}
             events={events}
             onRefreshEvents={handleRefreshEvents}
             onEditEvent={handleEditEvent}
+            onRollbackToEvent={handleRollbackToEvent}
           />
         </div>
       </div>
+
+      {/* Modals */}
+      {showProfileManager && (
+        <ProfileManager
+          profiles={globalProfiles}
+          onLoadProfiles={handleLoadProfiles}
+          onAddProfile={handleAddProfile}
+          onDeleteProfile={handleDeleteProfile}
+          onClose={() => setShowProfileManager(false)}
+        />
+      )}
+
+      {showPresetLoader && (
+        <GamePresetLoader
+          onLoadPreset={handleLoadPreset}
+          onClose={() => setShowPresetLoader(false)}
+        />
+      )}
 
       {loading && (
         <div className="loading-overlay">
