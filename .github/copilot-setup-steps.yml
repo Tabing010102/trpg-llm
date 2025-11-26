@@ -1,0 +1,42 @@
+# Copilot Setup Steps
+# Pre-installs dependencies so Copilot can build, test, and validate changes
+
+setup:
+  # Python backend setup
+  - name: Set up Python
+    run: |
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+      pip install -e .
+      pip install ruff pytest pytest-asyncio pytest-cov
+
+  # Frontend setup
+  - name: Set up Node.js and frontend
+    run: |
+      cd frontend
+      npm ci
+
+validate:
+  # Backend validation
+  - name: Run Python linting
+    run: ruff check trpg_llm/ tests/
+
+  - name: Run Python tests
+    run: pytest tests/ -v
+
+  # Frontend validation
+  - name: Run frontend type check
+    run: |
+      cd frontend
+      npx tsc -b --noEmit
+
+  - name: Run frontend lint
+    run: |
+      cd frontend
+      npm run lint
+
+  - name: Build frontend
+    run: |
+      cd frontend
+      npm run build
+
