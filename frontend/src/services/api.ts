@@ -17,6 +17,10 @@ import type {
   RollbackRequest,
   RollbackResponse,
   GameConfig,
+  AutoProgressionConfigRequest,
+  AutoProgressionConfigResponse,
+  AutoProgressionStatus,
+  AutoProgressResponse,
 } from '../types/api';
 
 const API_BASE = '';  // Using proxy, no need for full URL
@@ -195,6 +199,81 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ config }),
     });
+  }
+
+  // ===== Auto-Progression =====
+
+  async getAutoProgressionConfig(sessionId: string): Promise<AutoProgressionConfigResponse> {
+    return this.request<AutoProgressionConfigResponse>(
+      `${API_BASE}/sessions/${sessionId}/auto-progress/config`
+    );
+  }
+
+  async updateAutoProgressionConfig(
+    sessionId: string,
+    config: AutoProgressionConfigRequest
+  ): Promise<AutoProgressionConfigResponse> {
+    return this.request<AutoProgressionConfigResponse>(
+      `${API_BASE}/sessions/${sessionId}/auto-progress/config`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(config),
+      }
+    );
+  }
+
+  async getAutoProgressionStatus(sessionId: string): Promise<AutoProgressionStatus> {
+    return this.request<AutoProgressionStatus>(
+      `${API_BASE}/sessions/${sessionId}/auto-progress/status`
+    );
+  }
+
+  async runAutoProgression(
+    sessionId: string,
+    fromCharacterId?: string
+  ): Promise<AutoProgressResponse> {
+    const url = fromCharacterId
+      ? `${API_BASE}/sessions/${sessionId}/auto-progress?from_character_id=${encodeURIComponent(fromCharacterId)}`
+      : `${API_BASE}/sessions/${sessionId}/auto-progress`;
+    return this.request<AutoProgressResponse>(url, {
+      method: 'POST',
+    });
+  }
+
+  async retryAutoProgression(sessionId: string): Promise<AutoProgressResponse> {
+    return this.request<AutoProgressResponse>(
+      `${API_BASE}/sessions/${sessionId}/auto-progress/retry`,
+      {
+        method: 'POST',
+      }
+    );
+  }
+
+  async skipCurrentCharacter(sessionId: string): Promise<AutoProgressionStatus> {
+    return this.request<AutoProgressionStatus>(
+      `${API_BASE}/sessions/${sessionId}/auto-progress/skip`,
+      {
+        method: 'POST',
+      }
+    );
+  }
+
+  async pauseAutoProgression(sessionId: string): Promise<AutoProgressionStatus> {
+    return this.request<AutoProgressionStatus>(
+      `${API_BASE}/sessions/${sessionId}/auto-progress/pause`,
+      {
+        method: 'POST',
+      }
+    );
+  }
+
+  async resumeAutoProgression(sessionId: string): Promise<AutoProgressResponse> {
+    return this.request<AutoProgressResponse>(
+      `${API_BASE}/sessions/${sessionId}/auto-progress/resume`,
+      {
+        method: 'POST',
+      }
+    );
   }
 }
 

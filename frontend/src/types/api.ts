@@ -219,3 +219,50 @@ export interface ToolParameter {
   enum?: string[];
   default?: string | number | boolean;
 }
+
+// Auto-progression types
+export type ProgressionState = 'idle' | 'progressing' | 'waiting_for_user' | 'error' | 'paused';
+
+export interface ProgressionError {
+  character_id: string;
+  error_message: string;
+  position_in_queue: number;
+}
+
+export interface AutoProgressionStatus {
+  state: ProgressionState;
+  current_position: number;
+  queue: string[];
+  completed: string[];
+  error?: ProgressionError;
+  last_speaker_id?: string;
+}
+
+export interface AutoProgressionConfig {
+  enabled: boolean;
+  turn_order: string[];
+  stop_before_human: boolean;
+  continue_after_human: boolean;
+}
+
+export interface AutoProgressionConfigRequest {
+  enabled?: boolean;
+  turn_order?: string[];
+  stop_before_human?: boolean;
+  continue_after_human?: boolean;
+}
+
+export interface AutoProgressionConfigResponse {
+  session_id: string;
+  enabled: boolean;
+  turn_order: string[];
+  stop_before_human: boolean;
+  continue_after_human: boolean;
+}
+
+export interface AutoProgressResponse {
+  session_id: string;
+  status: AutoProgressionStatus;
+  messages: ChatResponse[];
+  stopped_reason?: 'human_turn' | 'error' | 'completed' | 'paused';
+}

@@ -12,6 +12,11 @@ from ..models.event import StateDiff
 from ..core.chat_pipeline import ChatPipeline
 from ..core.builtin_tools import create_builtin_tools_registry
 from ..llm.agent_manager import AIAgentManager
+from ..core.auto_progression import (
+    AutoProgressionManager,
+    AutoProgressionConfig,
+    ProgressionState,
+)
 from .schemas import (
     CreateSessionRequest,
     CreateSessionResponse,
@@ -28,6 +33,11 @@ from .schemas import (
     EditEventRequest,
     EditEventResponse,
     SetCharacterProfileRequest,
+    AutoProgressionConfigRequest,
+    AutoProgressionStatusResponse,
+    AutoProgressionConfigResponse,
+    AutoProgressResponse,
+    ProgressionErrorResponse,
 )
 
 
@@ -42,6 +52,9 @@ GLOBAL_PROFILE_REGISTRY: Optional[LLMProfileRegistry] = None
 
 # Per-session character profile overrides: {session_id: {character_id: profile_id}}
 SESSION_CHARACTER_PROFILES: Dict[str, Dict[str, str]] = {}
+
+# Per-session auto-progression managers
+AUTO_PROGRESSION_MANAGERS: Dict[str, AutoProgressionManager] = {}
 
 
 def create_app() -> FastAPI:
@@ -195,6 +208,19 @@ def create_app() -> FastAPI:
             
             # Initialize session character profiles (empty - use game preset defaults)
             SESSION_CHARACTER_PROFILES[session_id] = {}
+            
+            # Initialize auto-progression manager
+            auto_config_dict = config.auto_progression or {}
+            auto_config = AutoProgressionConfig(
+                enabled=auto_config_dict.get("enabled", False),
+                turn_order=auto_config_dict.get("turn_order", config.workflow.get("turn_order", [])),
+                stop_before_human=auto_config_dict.get("stop_before_human", True),
+                continue_after_human=auto_config_dict.get("continue_after_human", True),
+            )
+            AUTO_PROGRESSION_MANAGERS[session_id] = AutoProgressionManager(
+                characters=config.characters,
+                config=auto_config
+            )
             
             # Get initial state
             state = engine.get_state()
@@ -363,6 +389,8 @@ def create_app() -> FastAPI:
             del AGENT_MANAGERS[session_id]
         if session_id in SESSION_CHARACTER_PROFILES:
             del SESSION_CHARACTER_PROFILES[session_id]
+        if session_id in AUTO_PROGRESSION_MANAGERS:
+            del AUTO_PROGRESSION_MANAGERS[session_id]
         
         return {"message": "Session deleted", "session_id": session_id}
     
@@ -478,5 +506,233 @@ def create_app() -> FastAPI:
             )
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
+    
+    # ===== Auto-Progression Endpoints =====
+    
+    def _convert_progression_status(status) -> AutoProgressionStatusResponse:
+        """Convert internal progression status to API response"""
+        error_response = None
+        if status.error:
+            error_response = ProgressionErrorResponse(
+                character_id=status.error.character_id,
+                error_message=status.error.error_message,
+                position_in_queue=status.error.position_in_queue
+            )
+        
+        return AutoProgressionStatusResponse(
+            state=status.state.value,
+            current_position=status.current_position,
+            queue=status.queue,
+            completed=status.completed,
+            error=error_response,
+            last_speaker_id=status.last_speaker_id
+        )
+    
+    @app.get("/sessions/{session_id}/auto-progress/config", response_model=AutoProgressionConfigResponse)
+    async def get_auto_progression_config(session_id: str):
+        """Get auto-progression configuration for a session"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        config = manager.config
+        
+        return AutoProgressionConfigResponse(
+            session_id=session_id,
+            enabled=config.enabled,
+            turn_order=config.turn_order,
+            stop_before_human=config.stop_before_human,
+            continue_after_human=config.continue_after_human
+        )
+    
+    @app.put("/sessions/{session_id}/auto-progress/config", response_model=AutoProgressionConfigResponse)
+    async def update_auto_progression_config(session_id: str, request: AutoProgressionConfigRequest):
+        """Update auto-progression configuration"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        
+        # Update only provided fields
+        if request.enabled is not None:
+            manager.set_enabled(request.enabled)
+        if request.turn_order is not None:
+            manager.update_turn_order(request.turn_order)
+        if request.stop_before_human is not None:
+            manager.config.stop_before_human = request.stop_before_human
+        if request.continue_after_human is not None:
+            manager.config.continue_after_human = request.continue_after_human
+        
+        config = manager.config
+        return AutoProgressionConfigResponse(
+            session_id=session_id,
+            enabled=config.enabled,
+            turn_order=config.turn_order,
+            stop_before_human=config.stop_before_human,
+            continue_after_human=config.continue_after_human
+        )
+    
+    @app.get("/sessions/{session_id}/auto-progress/status", response_model=AutoProgressionStatusResponse)
+    async def get_auto_progression_status(session_id: str):
+        """Get current auto-progression status"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        status = manager.get_status()
+        
+        return _convert_progression_status(status)
+    
+    @app.post("/sessions/{session_id}/auto-progress", response_model=AutoProgressResponse)
+    async def run_auto_progression(session_id: str, from_character_id: Optional[str] = None):
+        """
+        Run auto-progression for AI characters.
+        
+        This will process all queued AI characters in sequence until:
+        - A human character's turn is reached
+        - An error occurs
+        - All characters in the queue have completed
+        
+        Args:
+            from_character_id: Start progression after this character (usually the human who just spoke)
+        """
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        pipeline = CHAT_PIPELINES[session_id]
+        
+        # Start progression
+        status = manager.start_progression(from_character_id)
+        
+        messages: list = []
+        stopped_reason = None
+        
+        # Process characters in sequence
+        while status.state == ProgressionState.PROGRESSING:
+            next_char = manager.get_next_character()
+            if not next_char:
+                stopped_reason = "completed"
+                break
+            
+            # Determine profile to use
+            session_profiles = SESSION_CHARACTER_PROFILES.get(session_id, {})
+            profile_id = session_profiles.get(next_char)
+            
+            try:
+                # Process chat for this character
+                result = await pipeline.process_chat(
+                    role_id=next_char,
+                    message=None,  # AI generates its own message
+                    llm_profile_id=profile_id
+                )
+                
+                # Check for errors in result
+                if result.get("error"):
+                    manager.mark_error(next_char, result["error"])
+                    stopped_reason = "error"
+                    break
+                
+                # Mark as completed and add to messages
+                manager.mark_completed(next_char)
+                messages.append(ChatResponse(**result))
+                
+            except Exception as e:
+                manager.mark_error(next_char, str(e))
+                stopped_reason = "error"
+                break
+            
+            # Update status for next iteration
+            status = manager.get_status()
+        
+        # Determine final stopped reason
+        if not stopped_reason:
+            if status.state == ProgressionState.WAITING_FOR_USER:
+                stopped_reason = "human_turn"
+            elif status.state == ProgressionState.PAUSED:
+                stopped_reason = "paused"
+            elif status.state == ProgressionState.ERROR:
+                stopped_reason = "error"
+            else:
+                stopped_reason = "completed"
+        
+        return AutoProgressResponse(
+            session_id=session_id,
+            status=_convert_progression_status(status),
+            messages=messages,
+            stopped_reason=stopped_reason
+        )
+    
+    @app.post("/sessions/{session_id}/auto-progress/retry", response_model=AutoProgressResponse)
+    async def retry_auto_progression(session_id: str):
+        """Retry auto-progression from the error point"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        
+        # Reset error state and retry
+        manager.retry_from_error()
+        
+        # Re-run progression
+        return await run_auto_progression(session_id)
+    
+    @app.post("/sessions/{session_id}/auto-progress/skip", response_model=AutoProgressionStatusResponse)
+    async def skip_current_character(session_id: str):
+        """Skip the current character in the progression queue"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        status = manager.skip_current()
+        
+        return _convert_progression_status(status)
+    
+    @app.post("/sessions/{session_id}/auto-progress/pause", response_model=AutoProgressionStatusResponse)
+    async def pause_auto_progression(session_id: str):
+        """Pause auto-progression"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        status = manager.pause()
+        
+        return _convert_progression_status(status)
+    
+    @app.post("/sessions/{session_id}/auto-progress/resume", response_model=AutoProgressResponse)
+    async def resume_auto_progression(session_id: str):
+        """Resume auto-progression from paused state"""
+        if session_id not in GAME_SESSIONS:
+            raise HTTPException(status_code=404, detail="Session not found")
+        
+        if session_id not in AUTO_PROGRESSION_MANAGERS:
+            raise HTTPException(status_code=404, detail="Auto-progression manager not found")
+        
+        manager = AUTO_PROGRESSION_MANAGERS[session_id]
+        manager.resume()
+        
+        # Continue progression
+        return await run_auto_progression(session_id)
     
     return app

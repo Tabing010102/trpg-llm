@@ -117,3 +117,47 @@ class EditEventResponse(BaseModel):
 class SetCharacterProfileRequest(BaseModel):
     """Request to set a character's profile for a session"""
     profile_id: str = Field(..., description="Profile ID to use for this character")
+
+
+# ===== Auto-Progression Schemas =====
+
+class AutoProgressionConfigRequest(BaseModel):
+    """Request to update auto-progression configuration"""
+    enabled: Optional[bool] = Field(None, description="Enable/disable auto-progression")
+    turn_order: Optional[List[str]] = Field(None, description="Character IDs in turn order")
+    stop_before_human: Optional[bool] = Field(None, description="Stop before human characters")
+    continue_after_human: Optional[bool] = Field(None, description="Continue after human speaks")
+
+
+class ProgressionErrorResponse(BaseModel):
+    """Error information for failed progression"""
+    character_id: str = Field(..., description="Character that encountered error")
+    error_message: str = Field(..., description="Error description")
+    position_in_queue: int = Field(..., description="Position in queue when error occurred")
+
+
+class AutoProgressionStatusResponse(BaseModel):
+    """Current status of auto-progression"""
+    state: str = Field(..., description="Current progression state (idle/progressing/waiting_for_user/error/paused)")
+    current_position: int = Field(..., description="Position in turn order")
+    queue: List[str] = Field(default_factory=list, description="Remaining characters to process")
+    completed: List[str] = Field(default_factory=list, description="Characters that completed their turn")
+    error: Optional[ProgressionErrorResponse] = Field(None, description="Error information if any")
+    last_speaker_id: Optional[str] = Field(None, description="Last character who spoke")
+
+
+class AutoProgressionConfigResponse(BaseModel):
+    """Current auto-progression configuration"""
+    session_id: str
+    enabled: bool
+    turn_order: List[str]
+    stop_before_human: bool
+    continue_after_human: bool
+
+
+class AutoProgressResponse(BaseModel):
+    """Response for auto-progression step"""
+    session_id: str
+    status: AutoProgressionStatusResponse
+    messages: List[ChatResponse] = Field(default_factory=list, description="Messages generated during progression")
+    stopped_reason: Optional[str] = Field(None, description="Reason progression stopped (human_turn/error/completed/paused)")
