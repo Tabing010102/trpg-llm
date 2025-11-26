@@ -34,6 +34,12 @@ class GameConfig(BaseModel):
         description="Game workflow and turn order"
     )
     
+    # Auto-progression configuration
+    auto_progression: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Auto-progression settings (enabled, turn_order, stop_before_human, continue_after_human)"
+    )
+    
     # Scripts and custom logic
     scripts: Dict[str, str] = Field(
         default_factory=dict,

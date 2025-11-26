@@ -1092,3 +1092,238 @@ body {
   gap: 0.5rem;
   align-items: center;
 }
+
+/* ===== Auto-Progression Panel ===== */
+
+.auto-progression-panel {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.auto-progression-panel h3 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  color: var(--text-highlight);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.auto-progression-panel .no-session {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+.auto-progression-panel .config-row {
+  margin-bottom: 0.75rem;
+}
+
+.auto-progression-panel .toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.auto-progression-panel .toggle-label input {
+  cursor: pointer;
+}
+
+/* Status Section */
+.auto-progression-panel .status-section {
+  background-color: var(--bg-tertiary);
+  padding: 0.75rem;
+  border-radius: 5px;
+  margin-bottom: 0.75rem;
+}
+
+.auto-progression-panel .status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.auto-progression-panel .status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.auto-progression-panel .status-text {
+  font-weight: bold;
+  color: var(--text-highlight);
+}
+
+.auto-progression-panel .queue-info,
+.auto-progression-panel .completed-info {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.25rem;
+}
+
+.auto-progression-panel .error-info {
+  background-color: rgba(244, 135, 113, 0.2);
+  border: 1px solid var(--accent-error);
+  color: var(--accent-error);
+  padding: 0.5rem;
+  border-radius: 3px;
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+/* Control Buttons */
+.auto-progression-panel .control-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* Turn Order Section */
+.auto-progression-panel .turn-order-section {
+  background-color: var(--bg-tertiary);
+  padding: 0.75rem;
+  border-radius: 5px;
+  margin-bottom: 0.75rem;
+}
+
+.auto-progression-panel .section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.auto-progression-panel .edit-buttons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.auto-progression-panel .turn-order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.auto-progression-panel .turn-order-list.readonly {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+}
+
+.auto-progression-panel .turn-order-list li {
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+}
+
+.auto-progression-panel .turn-order-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background-color: var(--bg-secondary);
+  border-radius: 3px;
+  margin-bottom: 0.25rem;
+}
+
+.auto-progression-panel .order-number {
+  color: var(--text-secondary);
+  min-width: 1.5rem;
+}
+
+.auto-progression-panel .character-name {
+  flex: 1;
+  color: var(--text-highlight);
+}
+
+.auto-progression-panel .control-badge {
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+
+.auto-progression-panel .control-badge.ai {
+  color: var(--accent-primary);
+}
+
+.auto-progression-panel .control-badge.human {
+  color: var(--accent-warning);
+}
+
+.auto-progression-panel .item-controls {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.auto-progression-panel .btn-tiny {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.625rem;
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.auto-progression-panel .btn-tiny:hover:not(:disabled) {
+  background-color: var(--bg-hover);
+}
+
+.auto-progression-panel .btn-tiny:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.auto-progression-panel .btn-tiny.btn-danger {
+  background-color: rgba(244, 135, 113, 0.3);
+  border-color: var(--accent-error);
+  color: var(--accent-error);
+}
+
+.auto-progression-panel .add-character {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.auto-progression-panel .add-character label {
+  color: var(--text-secondary);
+}
+
+.auto-progression-panel .add-character select {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  border-radius: 3px;
+}
+
+.auto-progression-panel .no-order {
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* Settings Section */
+.auto-progression-panel .settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.auto-progression-panel .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.auto-progression-panel .checkbox-label input {
+  cursor: pointer;
+}

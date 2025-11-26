@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import TopNav from './components/TopNav';
 import ChatWindow from './components/ChatWindow';
 import ChatInput from './components/ChatInput';
@@ -8,8 +8,19 @@ import DebugPanel from './components/DebugPanel';
 import ProfileManager from './components/ProfileManager';
 import GamePresetLoader from './components/GamePresetLoader';
 import DiceRoller from './components/DiceRoller';
+import AutoProgressionPanel from './components/AutoProgressionPanel';
 import { apiService } from './services/api';
-import type { GameState, StateDiff, Event, LLMProfile, GameConfig, DiceRollResult } from './types/api';
+import type { 
+  GameState, 
+  StateDiff, 
+  Event, 
+  LLMProfile, 
+  GameConfig, 
+  DiceRollResult,
+  AutoProgressionConfig,
+  AutoProgressionStatus,
+  ChatResponse,
+} from './types/api';
 import './App.css';
 
 // Default configuration for new sessions (using simple_game.json as reference)
@@ -95,6 +106,10 @@ function App() {
   // Dice roll state
   const [lastDiceResult, setLastDiceResult] = useState<DiceRollResult | null>(null);
 
+  // Auto-progression state
+  const [autoProgressConfig, setAutoProgressConfig] = useState<AutoProgressionConfig | null>(null);
+  const [autoProgressStatus, setAutoProgressStatus] = useState<AutoProgressionStatus | null>(null);
+
   // Fetch global profiles on mount
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -112,6 +127,8 @@ function App() {
   useEffect(() => {
     if (!sessionId) {
       setSessionCharacterProfiles({});
+      setAutoProgressConfig(null);
+      setAutoProgressStatus(null);
       return;
     }
     
@@ -124,6 +141,25 @@ function App() {
       }
     };
     fetchCharacterProfiles();
+
+    // Fetch auto-progression config and status
+    const fetchAutoProgressionData = async () => {
+      try {
+        const configResponse = await apiService.getAutoProgressionConfig(sessionId);
+        setAutoProgressConfig({
+          enabled: configResponse.enabled,
+          turn_order: configResponse.turn_order,
+          stop_before_human: configResponse.stop_before_human,
+          continue_after_human: configResponse.continue_after_human,
+        });
+
+        const statusResponse = await apiService.getAutoProgressionStatus(sessionId);
+        setAutoProgressStatus(statusResponse);
+      } catch {
+        // Auto-progression may not be available
+      }
+    };
+    fetchAutoProgressionData();
   }, [sessionId]);
 
   const showNotification = (message: string) => {
@@ -387,6 +423,146 @@ function App() {
     }
   };
 
+  // ===== Auto-Progression Handlers =====
+
+  const handleAutoProgressConfigChange = useCallback(async (config: Partial<AutoProgressionConfig>) => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const response = await apiService.updateAutoProgressionConfig(sessionId, config);
+      setAutoProgressConfig({
+        enabled: response.enabled,
+        turn_order: response.turn_order,
+        stop_before_human: response.stop_before_human,
+        continue_after_human: response.continue_after_human,
+      });
+      showNotification('Auto-progression config updated');
+    } catch (err) {
+      showNotification('Failed to update auto-progression config: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleRunAutoProgression = useCallback(async (fromCharacterId?: string) => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const response = await apiService.runAutoProgression(sessionId, fromCharacterId);
+      setAutoProgressStatus(response.status);
+      
+      // Update game state if messages were generated
+      if (response.messages.length > 0) {
+        const lastMessage = response.messages[response.messages.length - 1];
+        setGameState(lastMessage.current_state);
+        
+        // Aggregate state diffs from all messages
+        const allDiffs = response.messages.flatMap((msg: ChatResponse) => msg.state_diffs);
+        setRecentDiffs(allDiffs);
+      }
+
+      // Show notification based on stopped reason
+      if (response.stopped_reason === 'human_turn') {
+        showNotification(`Auto-progression paused - waiting for human input (${response.messages.length} messages generated)`);
+      } else if (response.stopped_reason === 'error') {
+        showNotification('Auto-progression stopped due to error');
+      } else if (response.stopped_reason === 'completed') {
+        showNotification(`Auto-progression completed (${response.messages.length} messages generated)`);
+      }
+    } catch (err) {
+      showNotification('Failed to run auto-progression: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleAutoProgressRetry = useCallback(async () => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const response = await apiService.retryAutoProgression(sessionId);
+      setAutoProgressStatus(response.status);
+      
+      if (response.messages.length > 0) {
+        const lastMessage = response.messages[response.messages.length - 1];
+        setGameState(lastMessage.current_state);
+        const allDiffs = response.messages.flatMap((msg: ChatResponse) => msg.state_diffs);
+        setRecentDiffs(allDiffs);
+      }
+
+      showNotification('Retry successful');
+    } catch (err) {
+      showNotification('Failed to retry: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleAutoProgressSkip = useCallback(async () => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const status = await apiService.skipCurrentCharacter(sessionId);
+      setAutoProgressStatus(status);
+      showNotification('Character skipped');
+    } catch (err) {
+      showNotification('Failed to skip: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleAutoProgressPause = useCallback(async () => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const status = await apiService.pauseAutoProgression(sessionId);
+      setAutoProgressStatus(status);
+      showNotification('Auto-progression paused');
+    } catch (err) {
+      showNotification('Failed to pause: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleAutoProgressResume = useCallback(async () => {
+    if (!sessionId) return;
+
+    setLoading(true);
+    try {
+      const response = await apiService.resumeAutoProgression(sessionId);
+      setAutoProgressStatus(response.status);
+      
+      if (response.messages.length > 0) {
+        const lastMessage = response.messages[response.messages.length - 1];
+        setGameState(lastMessage.current_state);
+        const allDiffs = response.messages.flatMap((msg: ChatResponse) => msg.state_diffs);
+        setRecentDiffs(allDiffs);
+      }
+
+      showNotification('Auto-progression resumed');
+    } catch (err) {
+      showNotification('Failed to resume: ' + (err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionId]);
+
+  const handleAutoProgressMessagesGenerated = useCallback((messages: ChatResponse[]) => {
+    // This is called when auto-progression generates messages
+    // Update game state with the latest message's state
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      setGameState(lastMessage.current_state);
+    }
+  }, []);
+
   return (
     <div className="app">
       <TopNav 
@@ -423,6 +599,20 @@ function App() {
         </div>
 
         <div className="right-panel">
+          <AutoProgressionPanel
+            sessionId={sessionId}
+            characters={gameState?.characters || {}}
+            config={autoProgressConfig}
+            status={autoProgressStatus}
+            onConfigChange={handleAutoProgressConfigChange}
+            onRunProgression={handleRunAutoProgression}
+            onRetry={handleAutoProgressRetry}
+            onSkip={handleAutoProgressSkip}
+            onPause={handleAutoProgressPause}
+            onResume={handleAutoProgressResume}
+            onMessagesGenerated={handleAutoProgressMessagesGenerated}
+            disabled={loading}
+          />
           <StatePanel gameState={gameState} />
           <DiceRoller
             characters={gameState?.characters || {}}
